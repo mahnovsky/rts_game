@@ -1,0 +1,13 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <CustomBuild Include="D:\zigs\tanks\external\glfw\build\CMakeFiles\c375223e0b53af9302e71befe807b63e\INSTALL_force.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="CMake Rules">
+      <UniqueIdentifier>{DE4DB705-92A3-394E-86E3-18E1A8C3742F}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

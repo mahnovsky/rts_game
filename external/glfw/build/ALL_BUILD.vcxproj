@@ -1,0 +1,305 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <PreferredToolArchitecture>x64</PreferredToolArchitecture>
+  </PropertyGroup>
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="MinSizeRel|x64">
+      <Configuration>MinSizeRel</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="RelWithDebInfo|x64">
+      <Configuration>RelWithDebInfo</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{B76CDA38-1F72-3DFC-A96D-9EBF1324934B}</ProjectGuid>
+    <WindowsTargetPlatformVersion>10.0.22000.0</WindowsTargetPlatformVersion>
+    <Keyword>Win32Proj</Keyword>
+    <Platform>x64</Platform>
+    <ProjectName>ALL_BUILD</ProjectName>
+    <VCProjectUpgraderObjectName>NoUpgrade</VCProjectUpgraderObjectName>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>Utility</ConfigurationType>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v143</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>Utility</ConfigurationType>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v143</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'" Label="Configuration">
+    <ConfigurationType>Utility</ConfigurationType>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v143</PlatformToolset>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'" Label="Configuration">
+    <ConfigurationType>Utility</ConfigurationType>
+    <CharacterSet>MultiByte</CharacterSet>
+    <PlatformToolset>v143</PlatformToolset>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup>
+    <_ProjectFileVersion>10.0.20506.1</_ProjectFileVersion>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(Platform)\$(Configuration)\$(ProjectName)\</IntDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(Platform)\$(Configuration)\$(ProjectName)\</IntDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">$(Platform)\$(Configuration)\$(ProjectName)\</IntDir>
+    <IntDir Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">$(Platform)\$(Configuration)\$(ProjectName)\</IntDir>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Midl>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
+      <HeaderFileName>%(Filename).h</HeaderFileName>
+      <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
+      <InterfaceIdentifierFileName>%(Filename)_i.c</InterfaceIdentifierFileName>
+      <ProxyFileName>%(Filename)_p.c</ProxyFileName>
+    </Midl>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Midl>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
+      <HeaderFileName>%(Filename).h</HeaderFileName>
+      <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
+      <InterfaceIdentifierFileName>%(Filename)_i.c</InterfaceIdentifierFileName>
+      <ProxyFileName>%(Filename)_p.c</ProxyFileName>
+    </Midl>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">
+    <Midl>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
+      <HeaderFileName>%(Filename).h</HeaderFileName>
+      <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
+      <InterfaceIdentifierFileName>%(Filename)_i.c</InterfaceIdentifierFileName>
+      <ProxyFileName>%(Filename)_p.c</ProxyFileName>
+    </Midl>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">
+    <Midl>
+      <AdditionalIncludeDirectories>%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
+      <HeaderFileName>%(Filename).h</HeaderFileName>
+      <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
+      <InterfaceIdentifierFileName>%(Filename)_i.c</InterfaceIdentifierFileName>
+      <ProxyFileName>%(Filename)_p.c</ProxyFileName>
+    </Midl>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <CustomBuild Include="D:\zigs\tanks\external\glfw\CMakeLists.txt">
+      <UseUtf8Encoding>Always</UseUtf8Encoding>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Building Custom Rule D:/zigs/tanks/external/glfw/CMakeLists.txt</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">setlocal
+C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\bin\cmake.exe -SD:/zigs/tanks/external/glfw -BD:/zigs/tanks/external/glfw/build --check-stamp-file D:/zigs/tanks/external/glfw/build/CMakeFiles/generate.stamp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\BasicConfigVersion-SameMajorVersion.cmake.in;C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\CMakeCInformation.cmake;C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\CMakeCommonLanguageInclude.cmake;C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\CMakeDependentOption.cmake;C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\CMakeGenericSystem.cmake;C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\CMakeInitializeConfigs.cmake;C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\CMakeLanguageInformation.cmake;C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\CMakePackageConfigHelpers.cmake;C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\CMakeRCInformation.cmake;C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\CMakeSystemSpecificInformation.cmake;C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\CMakeSystemSpecificInitialize.cmake;C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\CheckCSourceCompiles.cmake;C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\CheckIncludeFile.cmake;C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\CheckLibraryExists.cmake;C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\Compiler\CMakeCommonCompilerMacros.cmake;C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\Compiler\MSVC-C.cmake;C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\FindDoxygen.cmake;C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\FindPackageHandleStandardArgs.cmake;C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\FindPackageMessage.cmake;C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\FindThreads.cmake;C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\GNUInstallDirs.cmake;C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\Internal\CheckSourceCompiles.cmake;C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\Platform\Windows-MSVC-C.cmake;C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\Platform\Windows-MSVC.cmake;C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\Platform\Windows.cmake;C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\Platform\WindowsPaths.cmake;C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\WriteBasicConfigVersionFile.cmake;D:\zigs\tanks\external\glfw\CMake\cmake_uninstall.cmake.in;D:\zigs\tanks\external\glfw\CMake\glfw3Config.cmake.in;D:\zigs\tanks\external\glfw\build\CMakeFiles\3.22.1-g37088a8-dirty\CMakeCCompiler.cmake;D:\zigs\tanks\external\glfw\build\CMakeFiles\3.22.1-g37088a8-dirty\CMakeRCCompiler.cmake;D:\zigs\tanks\external\glfw\build\CMakeFiles\3.22.1-g37088a8-dirty\CMakeSystem.cmake;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">D:\zigs\tanks\external\glfw\build\CMakeFiles\generate.stamp</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">false</LinkObjects>
+      <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Building Custom Rule D:/zigs/tanks/external/glfw/CMakeLists.txt</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">setlocal
+C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\bin\cmake.exe -SD:/zigs/tanks/external/glfw -BD:/zigs/tanks/external/glfw/build --check-stamp-file D:/zigs/tanks/external/glfw/build/CMakeFiles/generate.stamp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\BasicConfigVersion-SameMajorVersion.cmake.in;C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\CMakeCInformation.cmake;C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\CMakeCommonLanguageInclude.cmake;C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\CMakeDependentOption.cmake;C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\CMakeGenericSystem.cmake;C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\CMakeInitializeConfigs.cmake;C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\CMakeLanguageInformation.cmake;C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\CMakePackageConfigHelpers.cmake;C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\CMakeRCInformation.cmake;C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\CMakeSystemSpecificInformation.cmake;C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\CMakeSystemSpecificInitialize.cmake;C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\CheckCSourceCompiles.cmake;C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\CheckIncludeFile.cmake;C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\CheckLibraryExists.cmake;C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\Compiler\CMakeCommonCompilerMacros.cmake;C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\Compiler\MSVC-C.cmake;C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\FindDoxygen.cmake;C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\FindPackageHandleStandardArgs.cmake;C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\FindPackageMessage.cmake;C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\FindThreads.cmake;C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\GNUInstallDirs.cmake;C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\Internal\CheckSourceCompiles.cmake;C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\Platform\Windows-MSVC-C.cmake;C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\Platform\Windows-MSVC.cmake;C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\Platform\Windows.cmake;C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\Platform\WindowsPaths.cmake;C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\WriteBasicConfigVersionFile.cmake;D:\zigs\tanks\external\glfw\CMake\cmake_uninstall.cmake.in;D:\zigs\tanks\external\glfw\CMake\glfw3Config.cmake.in;D:\zigs\tanks\external\glfw\build\CMakeFiles\3.22.1-g37088a8-dirty\CMakeCCompiler.cmake;D:\zigs\tanks\external\glfw\build\CMakeFiles\3.22.1-g37088a8-dirty\CMakeRCCompiler.cmake;D:\zigs\tanks\external\glfw\build\CMakeFiles\3.22.1-g37088a8-dirty\CMakeSystem.cmake;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">D:\zigs\tanks\external\glfw\build\CMakeFiles\generate.stamp</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='Release|x64'">false</LinkObjects>
+      <Message Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">Building Custom Rule D:/zigs/tanks/external/glfw/CMakeLists.txt</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">setlocal
+C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\bin\cmake.exe -SD:/zigs/tanks/external/glfw -BD:/zigs/tanks/external/glfw/build --check-stamp-file D:/zigs/tanks/external/glfw/build/CMakeFiles/generate.stamp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\BasicConfigVersion-SameMajorVersion.cmake.in;C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\CMakeCInformation.cmake;C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\CMakeCommonLanguageInclude.cmake;C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\CMakeDependentOption.cmake;C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\CMakeGenericSystem.cmake;C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\CMakeInitializeConfigs.cmake;C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\CMakeLanguageInformation.cmake;C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\CMakePackageConfigHelpers.cmake;C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\CMakeRCInformation.cmake;C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\CMakeSystemSpecificInformation.cmake;C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\CMakeSystemSpecificInitialize.cmake;C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\CheckCSourceCompiles.cmake;C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\CheckIncludeFile.cmake;C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\CheckLibraryExists.cmake;C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\Compiler\CMakeCommonCompilerMacros.cmake;C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\Compiler\MSVC-C.cmake;C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\FindDoxygen.cmake;C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\FindPackageHandleStandardArgs.cmake;C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\FindPackageMessage.cmake;C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\FindThreads.cmake;C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\GNUInstallDirs.cmake;C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\Internal\CheckSourceCompiles.cmake;C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\Platform\Windows-MSVC-C.cmake;C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\Platform\Windows-MSVC.cmake;C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\Platform\Windows.cmake;C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\Platform\WindowsPaths.cmake;C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\WriteBasicConfigVersionFile.cmake;D:\zigs\tanks\external\glfw\CMake\cmake_uninstall.cmake.in;D:\zigs\tanks\external\glfw\CMake\glfw3Config.cmake.in;D:\zigs\tanks\external\glfw\build\CMakeFiles\3.22.1-g37088a8-dirty\CMakeCCompiler.cmake;D:\zigs\tanks\external\glfw\build\CMakeFiles\3.22.1-g37088a8-dirty\CMakeRCCompiler.cmake;D:\zigs\tanks\external\glfw\build\CMakeFiles\3.22.1-g37088a8-dirty\CMakeSystem.cmake;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">D:\zigs\tanks\external\glfw\build\CMakeFiles\generate.stamp</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">false</LinkObjects>
+      <Message Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">Building Custom Rule D:/zigs/tanks/external/glfw/CMakeLists.txt</Message>
+      <Command Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">setlocal
+C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\bin\cmake.exe -SD:/zigs/tanks/external/glfw -BD:/zigs/tanks/external/glfw/build --check-stamp-file D:/zigs/tanks/external/glfw/build/CMakeFiles/generate.stamp
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal &amp; call :cmErrorLevel %errorlevel% &amp; goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd</Command>
+      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\BasicConfigVersion-SameMajorVersion.cmake.in;C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\CMakeCInformation.cmake;C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\CMakeCommonLanguageInclude.cmake;C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\CMakeDependentOption.cmake;C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\CMakeGenericSystem.cmake;C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\CMakeInitializeConfigs.cmake;C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\CMakeLanguageInformation.cmake;C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\CMakePackageConfigHelpers.cmake;C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\CMakeRCInformation.cmake;C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\CMakeSystemSpecificInformation.cmake;C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\CMakeSystemSpecificInitialize.cmake;C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\CheckCSourceCompiles.cmake;C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\CheckIncludeFile.cmake;C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\CheckLibraryExists.cmake;C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\Compiler\CMakeCommonCompilerMacros.cmake;C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\Compiler\MSVC-C.cmake;C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\FindDoxygen.cmake;C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\FindPackageHandleStandardArgs.cmake;C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\FindPackageMessage.cmake;C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\FindThreads.cmake;C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\GNUInstallDirs.cmake;C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\Internal\CheckSourceCompiles.cmake;C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\Platform\Windows-MSVC-C.cmake;C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\Platform\Windows-MSVC.cmake;C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\Platform\Windows.cmake;C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\Platform\WindowsPaths.cmake;C:\Users\mahno\AppData\Local\Android\Sdk\cmake\3.22.1\share\cmake-3.22\Modules\WriteBasicConfigVersionFile.cmake;D:\zigs\tanks\external\glfw\CMake\cmake_uninstall.cmake.in;D:\zigs\tanks\external\glfw\CMake\glfw3Config.cmake.in;D:\zigs\tanks\external\glfw\build\CMakeFiles\3.22.1-g37088a8-dirty\CMakeCCompiler.cmake;D:\zigs\tanks\external\glfw\build\CMakeFiles\3.22.1-g37088a8-dirty\CMakeRCCompiler.cmake;D:\zigs\tanks\external\glfw\build\CMakeFiles\3.22.1-g37088a8-dirty\CMakeSystem.cmake;%(AdditionalInputs)</AdditionalInputs>
+      <Outputs Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">D:\zigs\tanks\external\glfw\build\CMakeFiles\generate.stamp</Outputs>
+      <LinkObjects Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">false</LinkObjects>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="D:\zigs\tanks\external\glfw\build\ZERO_CHECK.vcxproj">
+      <Project>{4A8F0C43-E0BF-386A-87B5-F867B858A388}</Project>
+      <Name>ZERO_CHECK</Name>
+      <ReferenceOutputAssembly>false</ReferenceOutputAssembly>
+      <CopyToOutputDirectory>Never</CopyToOutputDirectory>
+    </ProjectReference>
+    <ProjectReference Include="D:\zigs\tanks\external\glfw\build\tests\allocator.vcxproj">
+      <Project>{ABE86B4E-E475-3CC9-9E12-0C18E3FEAB7D}</Project>
+      <Name>allocator</Name>
+    </ProjectReference>
+    <ProjectReference Include="D:\zigs\tanks\external\glfw\build\examples\boing.vcxproj">
+      <Project>{752A66BF-AC9A-3F61-8F4A-DCC9A397B07B}</Project>
+      <Name>boing</Name>
+    </ProjectReference>
+    <ProjectReference Include="D:\zigs\tanks\external\glfw\build\tests\clipboard.vcxproj">
+      <Project>{3FCB3FDC-80EF-3535-BF5B-CE468E67E0EF}</Project>
+      <Name>clipboard</Name>
+    </ProjectReference>
+    <ProjectReference Include="D:\zigs\tanks\external\glfw\build\tests\cursor.vcxproj">
+      <Project>{5C4E166D-0DC5-3399-8E04-F54CA5C462A9}</Project>
+      <Name>cursor</Name>
+    </ProjectReference>
+    <ProjectReference Include="D:\zigs\tanks\external\glfw\build\tests\empty.vcxproj">
+      <Project>{D33952EC-A970-3457-9380-3904E56C46D8}</Project>
+      <Name>empty</Name>
+    </ProjectReference>
+    <ProjectReference Include="D:\zigs\tanks\external\glfw\build\tests\events.vcxproj">
+      <Project>{A38968BD-D401-3C10-80F1-A81C97F84850}</Project>
+      <Name>events</Name>
+    </ProjectReference>
+    <ProjectReference Include="D:\zigs\tanks\external\glfw\build\tests\gamma.vcxproj">
+      <Project>{60A566D4-298D-3C20-9DD5-9C4A6096DA04}</Project>
+      <Name>gamma</Name>
+    </ProjectReference>
+    <ProjectReference Include="D:\zigs\tanks\external\glfw\build\examples\gears.vcxproj">
+      <Project>{0D8FF16B-522F-3436-A062-A6066019BCAD}</Project>
+      <Name>gears</Name>
+    </ProjectReference>
+    <ProjectReference Include="D:\zigs\tanks\external\glfw\build\src\glfw.vcxproj">
+      <Project>{1CCFD4A8-970D-39C8-91E7-F720E583C2C0}</Project>
+      <Name>glfw</Name>
+    </ProjectReference>
+    <ProjectReference Include="D:\zigs\tanks\external\glfw\build\tests\glfwinfo.vcxproj">
+      <Project>{4D4A3CA6-A125-321B-B435-9CEC8EEA9036}</Project>
+      <Name>glfwinfo</Name>
+    </ProjectReference>
+    <ProjectReference Include="D:\zigs\tanks\external\glfw\build\examples\heightmap.vcxproj">
+      <Project>{D32D1691-407A-3203-B4B3-74912D0405E6}</Project>
+      <Name>heightmap</Name>
+    </ProjectReference>
+    <ProjectReference Include="D:\zigs\tanks\external\glfw\build\tests\icon.vcxproj">
+      <Project>{E74D3DD5-8C29-3DDC-81B8-A0A4C30EDB37}</Project>
+      <Name>icon</Name>
+    </ProjectReference>
+    <ProjectReference Include="D:\zigs\tanks\external\glfw\build\tests\iconify.vcxproj">
+      <Project>{37803AC4-8AB1-3634-A005-F3EC3EB14758}</Project>
+      <Name>iconify</Name>
+    </ProjectReference>
+    <ProjectReference Include="D:\zigs\tanks\external\glfw\build\tests\inputlag.vcxproj">
+      <Project>{727878BE-C72E-336C-84DD-879951928D3C}</Project>
+      <Name>inputlag</Name>
+    </ProjectReference>
+    <ProjectReference Include="D:\zigs\tanks\external\glfw\build\tests\joysticks.vcxproj">
+      <Project>{EA2F031C-A91C-36A3-9C5B-36ABA6CCF83B}</Project>
+      <Name>joysticks</Name>
+    </ProjectReference>
+    <ProjectReference Include="D:\zigs\tanks\external\glfw\build\tests\monitors.vcxproj">
+      <Project>{6CAA4CE3-08AB-3DFB-88C0-E8E5701BA0F3}</Project>
+      <Name>monitors</Name>
+    </ProjectReference>
+    <ProjectReference Include="D:\zigs\tanks\external\glfw\build\tests\msaa.vcxproj">
+      <Project>{60CB5006-10F3-35DE-9A44-75F63F22BFAE}</Project>
+      <Name>msaa</Name>
+    </ProjectReference>
+    <ProjectReference Include="D:\zigs\tanks\external\glfw\build\examples\offscreen.vcxproj">
+      <Project>{C10F0468-0C51-3661-B19E-C2EE6EC6CBB8}</Project>
+      <Name>offscreen</Name>
+    </ProjectReference>
+    <ProjectReference Include="D:\zigs\tanks\external\glfw\build\examples\particles.vcxproj">
+      <Project>{DDBA2086-0804-3FBE-92B9-E757B2F9B01A}</Project>
+      <Name>particles</Name>
+    </ProjectReference>
+    <ProjectReference Include="D:\zigs\tanks\external\glfw\build\tests\reopen.vcxproj">
+      <Project>{B2055707-6FAB-3B01-BBE4-9148539016C8}</Project>
+      <Name>reopen</Name>
+    </ProjectReference>
+    <ProjectReference Include="D:\zigs\tanks\external\glfw\build\examples\sharing.vcxproj">
+      <Project>{68A7F916-B3B1-3A52-9CA2-9C15CA5795CB}</Project>
+      <Name>sharing</Name>
+    </ProjectReference>
+    <ProjectReference Include="D:\zigs\tanks\external\glfw\build\examples\splitview.vcxproj">
+      <Project>{CAB57B46-54A1-3C16-B8C7-37A99D70C1EE}</Project>
+      <Name>splitview</Name>
+    </ProjectReference>
+    <ProjectReference Include="D:\zigs\tanks\external\glfw\build\tests\tearing.vcxproj">
+      <Project>{AEB33382-9E6F-3AF8-916D-7411AF8054E6}</Project>
+      <Name>tearing</Name>
+    </ProjectReference>
+    <ProjectReference Include="D:\zigs\tanks\external\glfw\build\tests\threads.vcxproj">
+      <Project>{3124AA74-D885-35D6-92B0-83A56436C5CA}</Project>
+      <Name>threads</Name>
+    </ProjectReference>
+    <ProjectReference Include="D:\zigs\tanks\external\glfw\build\tests\timeout.vcxproj">
+      <Project>{06394C28-A447-30C1-8A53-F7009C89DD1F}</Project>
+      <Name>timeout</Name>
+    </ProjectReference>
+    <ProjectReference Include="D:\zigs\tanks\external\glfw\build\tests\title.vcxproj">
+      <Project>{96206E84-3EA1-3546-A5AE-9DFE275DD2C7}</Project>
+      <Name>title</Name>
+    </ProjectReference>
+    <ProjectReference Include="D:\zigs\tanks\external\glfw\build\examples\triangle-opengl.vcxproj">
+      <Project>{356228DA-2845-3FA0-9FE8-048A7609FF0F}</Project>
+      <Name>triangle-opengl</Name>
+    </ProjectReference>
+    <ProjectReference Include="D:\zigs\tanks\external\glfw\build\examples\triangle-opengles.vcxproj">
+      <Project>{5A67B7DD-4C92-3AD6-B1DA-87F773EBA75C}</Project>
+      <Name>triangle-opengles</Name>
+    </ProjectReference>
+    <ProjectReference Include="D:\zigs\tanks\external\glfw\build\tests\triangle-vulkan.vcxproj">
+      <Project>{5E9C6A1C-B550-37AC-9F30-0537972EAC58}</Project>
+      <Name>triangle-vulkan</Name>
+    </ProjectReference>
+    <ProjectReference Include="D:\zigs\tanks\external\glfw\build\examples\wave.vcxproj">
+      <Project>{7610F8F2-0E2A-30D6-ADD4-4CF5FE025E24}</Project>
+      <Name>wave</Name>
+    </ProjectReference>
+    <ProjectReference Include="D:\zigs\tanks\external\glfw\build\tests\window.vcxproj">
+      <Project>{A6CFFB29-9F47-3D37-95D7-24E0B913AC19}</Project>
+      <Name>window</Name>
+    </ProjectReference>
+    <ProjectReference Include="D:\zigs\tanks\external\glfw\build\examples\windows.vcxproj">
+      <Project>{274E6C67-74CB-3800-9224-27708949598F}</Project>
+      <Name>windows</Name>
+    </ProjectReference>
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>

@@ -1,0 +1,24 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <CustomBuild Include="D:\zigs\tanks\external\glfw\build\CMakeFiles\c375223e0b53af9302e71befe807b63e\update_mappings.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+    <CustomBuild Include="D:\zigs\tanks\external\glfw\src\CMakeLists.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="D:\zigs\tanks\external\glfw\src\mappings.h.in">
+      <Filter>Header Files</Filter>
+    </None>
+    <None Include="D:\zigs\tanks\external\glfw\CMake\GenerateMappings.cmake" />
+    <None Include="D:\zigs\tanks\external\glfw\build\src\CMakeFiles\update_mappings" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="CMake Rules">
+      <UniqueIdentifier>{DE4DB705-92A3-394E-86E3-18E1A8C3742F}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{25461841-DA9A-3E0C-A2BF-5149BD67DCAE}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>
