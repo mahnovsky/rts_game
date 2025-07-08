@@ -2,6 +2,8 @@ const std = @import("std");
 const Atlas = @import("atlas.zig").Atlas;
 const GameMap = @import("game_map.zig").GameMap;
 const MapData = @import("game_map.zig").MapData;
+const Serializer = @import("game_map.zig").Serializer;
+const YamlSerializer = @import("game_map.zig").YamlSerializer;
 const zm = @import("zm");
 const App = @import("app.zig").App;
 const Window = @import("Window.zig");
@@ -59,10 +61,7 @@ pub fn init(gpa: std.mem.Allocator, app: *App) !Game {
 
     const data = try utils.readFileData(gpa, "./data/maps/test_map.yaml");
     defer gpa.free(data);
-    const map_data = try MapData.load(
-        gpa,
-        data,
-    );
+    const map_data = try MapData.load(gpa, data, Serializer.init(YamlSerializer));
 
     std.log.debug("test map: {d}, {d}, {d}", .{ map_data.width, map_data.height, map_data.tile_data.len });
     for (map_data.tile_data) |index| {

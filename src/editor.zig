@@ -6,6 +6,8 @@ const app = @import("app.zig");
 const Game = @import("Game.zig");
 const Window = @import("Window.zig");
 const utils = @import("utils.zig");
+const Serializer = @import("game_map.zig").Serializer;
+const YamlSerializer = @import("game_map.zig").YamlSerializer;
 const glfw = @cImport({
     @cInclude("glfw/glfw3.h");
 });
@@ -103,7 +105,7 @@ pub const Editor = struct {
                     },
                     .ClickOnMap => |coords| game.map.tryReplaceTile(coords[0], coords[1], self.tile_index),
                     .SaveCurrentMap => {
-                        const data = try game.map.map_data.save(application.allocator);
+                        const data = try game.map.map_data.save(application.allocator, Serializer.init(YamlSerializer));
                         defer application.allocator.free(data);
                         try utils.writeFileData("./data/maps/test_map.yaml", data);
                     },

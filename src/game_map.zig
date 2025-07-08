@@ -53,21 +53,79 @@ fn makeVertexData(gpa: std.mem.Allocator, buffer: *std.ArrayListUnmanaged(opengl
     return buffer.items;
 }
 
+const Allocator = std.mem.Allocator;
+
+pub const Serializer = struct {
+    const Self = @This();
+    saveFunc: ?*const fn (Allocator, *const MapData) []u8 = null,
+    loadFunc: ?*const fn (Allocator, []u8) MapData = null,
+
+    pub fn init(comptime T: type) Serializer {
+        const gen = struct {
+            fn save(arena: Allocator, map_data: *const MapData) []u8 {
+                return T.save(arena, map_data);
+            }
+
+            fn load(arena: Allocator, data: []u8) MapData {
+                return T.load(arena, data);
+            }
+        };
+
+        return .{
+            .saveFunc = gen.save,
+            .loadFunc = gen.load,
+        };
+    }
+
+    fn save(self: Self, gpa: Allocator, map_data: *const MapData) []u8 {
+        if (self.saveFunc) |saveFunc| {
+            return saveFunc(gpa, map_data);
+        }
+        unreachable;
+    }
+
+    fn load(self: Self, gpa: Allocator, data: []u8) MapData {
+        if (self.loadFunc) |loadFunc| {
+            return loadFunc(gpa, data);
+        }
+        unreachable;
+    }
+};
+
+pub const YamlSerializer = struct {
+    const Self = @This();
+
+    fn load(gpa: Allocator, data: []u8) MapData {
+        var doc = Yaml{ .source = data };
+
+        doc.load(gpa) catch {
+            return MapData.empty;
+        };
+
+        const map_data = doc.parse(gpa, MapData) catch MapData.empty;
+
+        return map_data;
+    }
+
+    fn save(gpa: Allocator, map_data: *const MapData) []u8 {
+        var list = std.ArrayList(u8).init(gpa);
+        yaml.stringify(gpa, map_data.*, list.writer()) catch return &.{};
+
+        return list.toOwnedSlice() catch &.{};
+    }
+};
+
 pub const MapData = struct {
     const Self = @This();
     const TileSize: f32 = 32 * TileScale;
+    const empty: Self = .{ .width = 0, .height = 0, .tile_data = &.{} };
 
     width: u32,
     height: u32,
     tile_data: []u16,
 
-    pub fn load(gpa: std.mem.Allocator, data: []u8) !MapData {
-        var doc: Yaml = .{ .source = data };
-
-        try doc.load(gpa);
-        defer doc.deinit(gpa);
-
-        const map_data = try doc.parse(gpa, MapData);
+    pub fn load(gpa: std.mem.Allocator, data: []u8, s: Serializer) !MapData {
+        const map_data = s.load(gpa, data);
 
         return .{
             .width = map_data.width,
@@ -76,11 +134,8 @@ pub const MapData = struct {
         };
     }
 
-    pub fn save(self: Self, gpa: std.mem.Allocator) ![]u8 {
-        var list = std.ArrayList(u8).init(gpa);
-        try yaml.stringify(gpa, self, list.writer());
-
-        return list.toOwnedSlice();
+    pub fn save(self: Self, gpa: std.mem.Allocator, s: Serializer) ![]u8 {
+        return s.save(gpa, &self);
     }
 
     pub fn deinit(self: Self, gpa: std.mem.Allocator) void {
