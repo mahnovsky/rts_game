@@ -33,7 +33,7 @@ fn makeVertexData(gpa: std.mem.Allocator, buffer: *std.ArrayListUnmanaged(opengl
     for (indices, 0..indices.len) |c, pos| {
         const index = std.math.clamp(@as(u32, c), 0, atlas.rects.len - 1);
         const next_y = @floor(@as(f32, @floatFromInt(pos)) / w);
-        std.log.debug("makeVertexData index={d} y = {d}", .{ pos, y });
+        //std.log.debug("makeVertexData index={d} y = {d}", .{ pos, y });
         if (next_y > y) {
             x = 0;
             y = next_y;
@@ -101,6 +101,7 @@ pub const YamlSerializer = struct {
         doc.load(gpa) catch {
             return MapData.empty;
         };
+        defer doc.deinit(gpa);
 
         const map_data = doc.parse(gpa, MapData) catch MapData.empty;
 
@@ -126,6 +127,7 @@ pub const MapData = struct {
 
     pub fn load(gpa: std.mem.Allocator, data: []u8, s: Serializer) !MapData {
         const map_data = s.load(gpa, data);
+        defer map_data.deinit(gpa);
 
         return .{
             .width = map_data.width,

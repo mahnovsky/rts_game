@@ -9,6 +9,7 @@ const App = @import("app.zig").App;
 const Window = @import("Window.zig");
 const utils = @import("utils.zig");
 const editor = @import("editor.zig");
+const ecs = @import("ecs.zig");
 
 const Game = @This();
 const CamSpeed: f32 = 200;
@@ -28,7 +29,7 @@ fn initRandom() !void {
         break :blk seed;
     });
 }
-
+var game_instance: ?*Game = null;
 app: *App,
 map: GameMap,
 frame_time: f64 = 0,
@@ -36,6 +37,7 @@ proj: zm.Mat4f,
 camera: zm.Mat4f,
 camera_offset: zm.Vec2f,
 move_camera: bool,
+ecs_inst: ecs.Ecs,
 
 pub fn init(gpa: std.mem.Allocator, app: *App) !Game {
     const proj = zm.Mat4f.orthographic(
@@ -80,11 +82,48 @@ pub fn init(gpa: std.mem.Allocator, app: *App) !Game {
         .camera = zm.Mat4f.identity(),
         .camera_offset = .{ 0, 0 },
         .move_camera = true,
+        .ecs_inst = try ecs.Ecs.init(gpa),
     };
 }
 
 pub fn deinit(game: *Game, gpa: std.mem.Allocator) void {
     game.map.deinit(gpa);
+    game.ecs_inst.deinit();
+}
+
+pub fn postInit(game: *Game) !void {
+    const Movable = struct {
+        const Self = @This();
+        component: ecs.Component,
+        pos: f32,
+
+        pub fn init() Self {
+            return .{
+                .component = ecs.Component.init(Self),
+                .pos = 0,
+            };
+        }
+    };
+
+    const Transform = struct {
+        const Self = @This();
+        component: ecs.Component,
+        pos: f32,
+
+        pub fn init() Self {
+            return .{
+                .component = ecs.Component.init(Self),
+                .pos = 0,
+            };
+        }
+    };
+
+    const ent = try game.ecs_inst.makeEntity();
+
+    const tr = try game.ecs_inst.addComponent(Transform, ent);
+    const mv = try game.ecs_inst.addComponent(Movable, ent);
+
+    std.log.debug("transform {d}, movable {d}", .{ tr.component.type_index, mv.component.type_index });
 }
 
 fn applyCameraOffset(game: *Game) void {

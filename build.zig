@@ -74,7 +74,7 @@ pub fn build(b: *std.Build) void {
     //const glfw3 = buildGlfw3(b, target, optimize);
 
     const exe = b.addExecutable(.{
-        .name = "tanks",
+        .name = "rts_game",
         .root_source_file = b.path("src/main.zig"),
         .target = target,
         .optimize = optimize,
