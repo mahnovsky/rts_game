@@ -66,9 +66,9 @@ pub fn init(gpa: std.mem.Allocator, app: *App) !Game {
     const map_data = try MapData.load(gpa, data, Serializer.init(YamlSerializer));
 
     std.log.debug("test map: {d}, {d}, {d}", .{ map_data.width, map_data.height, map_data.tile_data.len });
-    for (map_data.tile_data) |index| {
-        std.log.debug("test map index: {d}", .{index});
-    }
+    //for (map_data.tile_data) |index| {
+    //std.log.debug("test map index: {d}", .{index});
+    //}
 
     return .{
         .map = try GameMap.init(
@@ -118,12 +118,29 @@ pub fn postInit(game: *Game) !void {
         }
     };
 
-    const ent = try game.ecs_inst.makeEntity();
+    for (0..20) |_| {
+        const ent = try game.ecs_inst.makeEntity();
 
-    const tr = try game.ecs_inst.addComponent(Transform, ent);
-    const mv = try game.ecs_inst.addComponent(Movable, ent);
+        _ = try game.ecs_inst.addComponent(Transform, ent);
+        _ = try game.ecs_inst.addComponent(Movable, ent);
+    }
+    var tr_iter = try game.ecs_inst.getIterator(Transform);
+    var mv_iter = try game.ecs_inst.getIterator(Movable);
+    var i: u32 = 0;
+    while (!mv_iter.isEnd() and !tr_iter.isEnd()) {
+        const tr = tr_iter.get();
+        const mv = mv_iter.get();
+        if (tr != null and mv != null) {
+            std.debug.print("Movable iteration {d}\n", .{i});
+            i += 1;
 
-    std.log.debug("transform {d}, movable {d}", .{ tr.component.type_index, mv.component.type_index });
+            tr.?.pos += mv.?.pos;
+        }
+        tr_iter = tr_iter.next();
+        mv_iter = mv_iter.next();
+    }
+
+    //std.log.debug("transform {d}, movable {d}", .{ tr.component.type_index, mv.component.type_index });
 }
 
 fn applyCameraOffset(game: *Game) void {

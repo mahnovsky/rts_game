@@ -3,6 +3,7 @@ const Allocator = std.mem.Allocator;
 
 const TypeIdData = struct {
     index: u32 = std.math.maxInt(u32),
+    flag: u32 = 0,
 };
 
 const InnerTypeId = *TypeIdData;
@@ -38,8 +39,14 @@ pub fn initTypeIndex(comptime T: type) u32 {
     const index = gen.counter;
     gen.counter += 1;
     index_ptr.* = index;
+    const flag_ptr = &innerTypeId(T).flag;
+    flag_ptr.* = std.math.pow(u32, 2, index);
 
     return index;
+}
+
+pub fn getComponentFlag(comptime T: type) u32 {
+    return innerTypeId(T).flag;
 }
 
 const EntityImpl = struct {
@@ -69,6 +76,71 @@ fn makeBucket(comptime T: type) type {
         const Self = @This();
         const Count = 32;
         const AddResult = struct { ptr: *T, pos: u32 };
+        const GetItemError = error{
+            OutOfBounds,
+            NotAlive,
+        };
+
+        fn makeBucketIterator() type {
+            return struct {
+                const Container = Self;
+                const Empty: @This() = .{
+                    .container = null,
+                    .index = 0,
+                };
+                container: ?*Container,
+                index: usize,
+
+                fn next(self: @This()) @This() {
+                    const nextIndex = self.index + 1;
+                    std.debug.print("next index {d}\n", .{nextIndex});
+                    if (nextIndex >= Count) {
+                        return Empty;
+                    }
+                    return .{
+                        .container = self.container,
+                        .index = nextIndex,
+                    };
+                }
+
+                fn findNextAlive(self: @This()) usize {
+                    if (self.container) |container| {
+                        const alives = container.alives;
+                        if (alives == 0) {
+                            //std.debug.print("alives {d}\n", .{alives});
+                            return Count;
+                        }
+
+                        const shift: u32 = @intCast(self.index);
+                        var it = std.math.pow(u32, 2, shift);
+                        var index = self.index;
+                        while ((alives & it) == 0) {
+                            it <<= 1;
+                            index += 1;
+                            //std.debug.print("it {d} index {d}\n", .{ it, index });
+                            if (index >= Count) {
+                                break;
+                            }
+                        }
+                        return index;
+                    }
+                    return Count;
+                }
+
+                fn get(self: *@This()) ?*T {
+                    if (self.container) |container| {
+                        return container.get(self.index);
+                    }
+                    return null;
+                }
+
+                fn isEnd(self: @This()) bool {
+                    return self.container == null;
+                }
+            };
+        }
+
+        const Iterator = makeBucketIterator();
         allocator: Allocator,
         alives: u32,
         components: []T,
@@ -83,6 +155,26 @@ fn makeBucket(comptime T: type) type {
 
         fn deinit(self: Self) void {
             self.allocator.free(self.components);
+        }
+
+        fn getIterator(self: *Self) Iterator {
+            return .{
+                .container = self,
+                .index = 0,
+            };
+        }
+
+        fn get(self: Self, index: usize) ?*T {
+            std.debug.print("get from bucket {}\n", .{index});
+            if (index >= self.components.len) {
+                return null;
+            }
+            const place = std.math.pow(u32, 2, @intCast(index));
+            if ((self.alives & place) == 0) {
+                return null;
+            }
+
+            return &self.components[index];
         }
 
         fn isFull(self: Self) bool {
@@ -106,8 +198,7 @@ fn makeBucket(comptime T: type) type {
 
             std.debug.assert((bit & self.alives) == 0);
             self.alives |= bit;
-
-            //self.components[index] = T.init();
+            std.debug.print("alloc pos {d} index {d} alives {d}\n", .{ pos, index, self.alives });
 
             return &self.components[index];
         }
@@ -239,9 +330,65 @@ fn makeContainer(comptime T: type) type {
     const Container = struct {
         const Self = @This();
         const Bucket = makeBucket(T);
-
+        const Iterator = makeIterator(T);
         buckets: std.ArrayList(Bucket),
         allocator: Allocator,
+
+        fn makeIterator(comptime Item: type) type {
+            return struct {
+                const Container = Self;
+                const This = @This();
+                container: ?*Container,
+                bucket_index: usize = 0,
+                item_iter: Bucket.Iterator,
+
+                pub fn next(self: *This) This {
+                    if (self.container) |container| {
+                        //std.debug.print("next bucket index {d}", .{self.bucketIndex});
+                        const next_iter = self.item_iter.next();
+                        if (!next_iter.isEnd()) {
+                            return .{
+                                .container = container,
+                                .bucket_index = self.bucket_index,
+                                .item_iter = next_iter,
+                            };
+                        }
+
+                        const newBucket = self.bucket_index + 1;
+                        if (newBucket < container.buckets.items.len) {
+                            return .{
+                                .container = container,
+                                .bucket_index = newBucket,
+                                .item_iter = container.buckets.items[newBucket].getIterator(),
+                            };
+                        }
+                    }
+                    //std.debug.print("end bucket index {d}", .{self.bucketIndex});
+                    return .{
+                        .container = null,
+                        .bucket_index = 0,
+                        .item_iter = Bucket.Iterator.Empty,
+                    };
+                }
+
+                pub fn get(self: *This) ?*Item {
+                    std.debug.print("container iter get {d}\n", .{self.item_iter.index});
+                    return self.item_iter.get();
+                }
+
+                pub fn isEnd(self: This) bool {
+                    return self.container == null;
+                }
+            };
+        }
+
+        fn getIterator(self: *Self) Iterator {
+            return .{
+                .container = self,
+                .bucket_index = 0,
+                .item_iter = self.buckets.items[0].getIterator(),
+            };
+        }
 
         fn create(gpa: Allocator) !*Self {
             const container = try gpa.create(Self);
@@ -285,13 +432,13 @@ fn makeContainer(comptime T: type) type {
             const bucket_index = getBucketIndex(entity);
             std.debug.assert(self.buckets.items.len > bucket_index);
 
-            const bucket = self.buckets.items[bucket_index];
+            const bucket = &self.buckets.items[bucket_index];
             return bucket.allocOrGet(entity.index);
         }
 
         fn addComponent(self: *Self, entity: Entity) !*T {
             const bucket_index = getBucketIndex(entity);
-
+            std.debug.print("alloc new bucket {d}\n", .{bucket_index});
             if (self.buckets.items.len <= bucket_index) {
                 const last = self.buckets.items.len;
                 try self.buckets.resize(bucket_index + 1);
@@ -301,9 +448,11 @@ fn makeContainer(comptime T: type) type {
                 }
             }
 
-            var bucket = self.buckets.items[bucket_index];
+            std.debug.print("alloc new bucket {d}\n", .{bucket_index});
+            var bucket = &self.buckets.items[bucket_index];
             const comp = bucket.allocOrGet(entity.index);
             comp.* = T.init();
+            entity.components |= getComponentFlag(T);
             return comp;
         }
 
@@ -325,6 +474,10 @@ const Entities = struct {
     storage: BaseStorage,
     allocator: Allocator,
     counter: u32 = 0,
+
+    const Iterator = struct {
+        index: u32,
+    };
 
     fn init(gpa: Allocator) !Self {
         return Self{
@@ -378,8 +531,7 @@ pub const Ecs = struct {
     fn getContainer(self: *Self, comptime T: type) !*makeContainer(T) {
         const Container = makeContainer(T);
 
-        _ = initTypeIndex(T);
-        const index = typeIndex(T);
+        const index = initTypeIndex(T);
         if (self.components.items.len <= index) {
             const container = try Container.create(self.allocator);
             try self.components.append(container.getComponentContainer());
@@ -405,7 +557,9 @@ pub const Ecs = struct {
         return container.getComponent(entity);
     }
 
-    //pub fn getIterator(comptime T: type) Iterator(T) {
+    pub fn getIterator(self: *Self, comptime T: type) !makeContainer(T).Iterator {
+        const container = try self.getContainer(T);
 
-    //}
+        return container.getIterator();
+    }
 };
