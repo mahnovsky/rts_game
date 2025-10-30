@@ -14,7 +14,10 @@ const glfw = @cImport({
 
 pub const Command = union(enum) {
     const Self = @This();
-    OpenTextureView: struct { atl: atlas.Atlas, orig: ?*glfw.GLFWwindow },
+    OpenTextureView: struct {
+        atl: atlas.Atlas,
+        orig: *anyopaque,
+    },
     PickTextureIndex: u32,
     ClickOnMap: @Vector(2, u32),
     SaveCurrentMap: void,
@@ -34,7 +37,7 @@ pub const Editor = struct {
     pub fn init(gpa: std.mem.Allocator) Self {
         return .{
             .gpa = gpa,
-            .command_queue = .init(gpa),
+            .command_queue = .empty,
             .texture_view_window = null,
         };
     }
@@ -43,15 +46,15 @@ pub const Editor = struct {
         if (self.texture_view_window != null) {
             self.texture_view_window.?.close();
         }
-        self.command_queue.deinit();
+        self.command_queue.deinit(self.gpa);
     }
 
     pub fn pushCommand(self: *Self, command: Command) !void {
         std.log.debug("push command {s}", .{@tagName(command)});
-        try self.command_queue.append(command);
+        try self.command_queue.append(self.gpa, command);
     }
 
-    pub fn showTextureViewWindow(self: *Self, atl: atlas.Atlas, orig: ?*glfw.GLFWwindow) !void {
+    pub fn showTextureViewWindow(self: *Self, atl: atlas.Atlas, orig: *anyopaque) !void {
         if (self.texture_view_window == null) {
             std.log.debug("texture_view_window", .{});
             self.texture_view_window = try texture_view.TextureViewWindow.init(self.gpa, &atl, orig, self);
@@ -79,10 +82,12 @@ pub const Editor = struct {
         if (application.window.getLastMouseEvent()) |event| {
             if (event.state == .Press and event.btn == .Left) {
                 if (pos[0] < 100 and pos[1] < 100) {
-                    try self.pushCommand(.{ .OpenTextureView = .{
-                        .atl = game.map.render_data.atlas,
-                        .orig = game.app.window.window,
-                    } });
+                    try self.pushCommand(.{
+                        .OpenTextureView = .{
+                            .atl = game.map.render_data.atlas,
+                            .orig = game.app.window.window.?,
+                        },
+                    });
                 }
                 if (pos[0] > 100 and pos[0] < 200 and pos[1] < 100) {
                     try self.pushCommand(.SaveCurrentMap);

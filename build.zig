@@ -2,7 +2,7 @@ const std = @import("std");
 
 const CompileStep = std.Build.Step.Compile;
 
-pub fn buildGlad(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) *CompileStep {
+pub fn buildGlad(b: *std.Build, _: *std.Build.Module, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) *CompileStep {
     const c_flags = [_][]const u8{
         // when compiling this lib in debug mode, it seems to add -fstack-protector so if you want to link it
         // with an exe built with -Dtarget=x86_64-windows-msvc you need the line below or you'll get undefined symbols
@@ -14,23 +14,45 @@ pub fn buildGlad(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.
         "-DUNICODE",
     };
 
-    const lib = b.addStaticLibrary(.{ .target = target, .name = "glad", .optimize = optimize });
-    lib.linkLibC();
+    //const lib = b.addStaticLibrary(.{ .target = target, .name = "glad", .optimize = optimize });
+    const module = b.createModule(.{
+        .link_libc = true,
+        .target = target,
+        .optimize = optimize,
+    });
 
-    lib.addIncludePath(b.path("external/glad/include"));
-    lib.addCSourceFile(.{ .file = b.path("external/glad/src/glad.c"), .flags = &c_flags });
+    module.addIncludePath(b.path("external/glad/include"));
+    module.addCSourceFile(.{ .file = b.path("external/glad/src/glad.c"), .flags = &c_flags });
+    const lib = b.addLibrary(.{
+        .root_module = module,
+        .name = "glad",
+        .linkage = .static,
+    });
 
     return lib;
 }
 
 pub fn buildGlfw3(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) *CompileStep {
-    const lib = b.addStaticLibrary(.{ .target = target, .name = "glfw3", .optimize = optimize });
-    lib.linkLibC();
-    lib.addIncludePath(.{ .path = "./external/glfw/src" });
-    lib.addIncludePath(.{ .path = "./external/glfw/include" });
-    lib.addIncludePath(.{ .path = "./external/glfw/build/src" });
+    const module = b.createModule(.{
+        .link_libc = true,
+        .target = target,
+        .optimize = optimize,
+    });
 
-    const c_flags = [_][]const u8{ "-fno-stack-protector", "-D_STDIO_DEFINED", "-DWIN32", "-D_WINDOWS", "-DNDEBUG", "-D_GLFW_WIN32", "-DUNICODE", "-D_UNICODE", "-D_CRT_SECURE_NO_WARNINGS" };
+    module.addIncludePath(.{ .path = "./external/glfw/src" });
+    module.addIncludePath(.{ .path = "./external/glfw/include" });
+    module.addIncludePath(.{ .path = "./external/glfw/build/src" });
+    const c_flags = [_][]const u8{
+        "-fno-stack-protector",
+        "-D_STDIO_DEFINED",
+        "-DWIN32",
+        "-D_WINDOWS",
+        "-DNDEBUG",
+        "-D_GLFW_WIN32",
+        "-DUNICODE",
+        "-D_UNICODE",
+        "-D_CRT_SECURE_NO_WARNINGS",
+    };
 
     const sources = [_][]const u8{
         "context.c",
@@ -60,8 +82,15 @@ pub fn buildGlfw3(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std
 
     const src_dir = "./external/glfw/src/";
     inline for (sources) |src| {
-        lib.addCSourceFile(.{ .file = .{ .path = src_dir ++ src }, .flags = &c_flags });
+        module.addCSourceFile(.{ .file = .{ .path = src_dir ++ src }, .flags = &c_flags });
     }
+
+    const lib = b.addLibrary(.{
+        .root_module = module,
+        .target = target,
+        .name = "glfw3",
+        .optimize = optimize,
+    });
 
     return lib;
 }
@@ -70,36 +99,40 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{ .default_target = .{ .os_tag = std.Target.Os.Tag.windows, .abi = std.Target.Abi.msvc } });
     const optimize = b.standardOptimizeOption(.{});
 
-    const glad = buildGlad(b, target, optimize);
     //const glfw3 = buildGlfw3(b, target, optimize);
-
-    const exe = b.addExecutable(.{
-        .name = "rts_game",
+    const root_module = b.createModule(.{
         .root_source_file = b.path("src/main.zig"),
         .target = target,
         .optimize = optimize,
+        .link_libc = true,
+    });
+    const glad = buildGlad(b, root_module, target, optimize);
+
+    const exe = b.addExecutable(.{
+        .name = "rts_game",
+        .root_module = root_module,
     });
 
-    exe.addIncludePath(b.path("external/glad/include"));
-    exe.addIncludePath(b.path("external/glfw/include"));
-    exe.addIncludePath(b.path("external/glfw/src"));
-    exe.addLibraryPath(b.path("external/glfw/build/src/Release"));
+    root_module.addIncludePath(b.path("external/glad/include"));
+    root_module.addIncludePath(b.path("external/glfw/include"));
+    root_module.addIncludePath(b.path("external/glfw/src"));
+    root_module.addLibraryPath(b.path("external/glfw/build/src/Release"));
 
-    exe.linkLibC();
-    exe.linkLibrary(glad);
+    //root_module.linkLibC();
+    root_module.linkLibrary(glad);
     //exe.linkLibrary(glfw3);
-    exe.linkSystemLibrary("glfw3");
-    exe.linkSystemLibrary("opengl32");
-    exe.linkSystemLibrary("kernel32");
-    exe.linkSystemLibrary("user32");
-    exe.linkSystemLibrary("gdi32");
-    exe.linkSystemLibrary("winspool");
-    exe.linkSystemLibrary("shell32");
-    exe.linkSystemLibrary("ole32");
-    exe.linkSystemLibrary("oleaut32");
-    exe.linkSystemLibrary("uuid");
-    exe.linkSystemLibrary("comdlg32");
-    exe.linkSystemLibrary("advapi32");
+    root_module.linkSystemLibrary("glfw3", .{});
+    root_module.linkSystemLibrary("opengl32", .{});
+    root_module.linkSystemLibrary("kernel32", .{});
+    root_module.linkSystemLibrary("user32", .{});
+    root_module.linkSystemLibrary("gdi32", .{});
+    root_module.linkSystemLibrary("winspool", .{});
+    root_module.linkSystemLibrary("shell32", .{});
+    root_module.linkSystemLibrary("ole32", .{});
+    root_module.linkSystemLibrary("oleaut32", .{});
+    root_module.linkSystemLibrary("uuid", .{});
+    root_module.linkSystemLibrary("comdlg32", .{});
+    root_module.linkSystemLibrary("advapi32", .{});
 
     const zm = b.dependency("zm", .{});
     exe.root_module.addImport("zm", zm.module("zm"));
@@ -114,7 +147,7 @@ pub fn build(b: *std.Build) void {
     const tt = b.dependency("TrueType", .{});
     exe.root_module.addImport("TrueType", tt.module("TrueType"));
 
-    const yaml = b.dependency("yaml", .{
+    const yaml = b.dependency("zig_yaml", .{
         .target = target,
         .optimize = optimize,
     });

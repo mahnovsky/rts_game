@@ -1,4 +1,5 @@
 const std = @import("std");
+const OutBucket = @import("Bucket.zig");
 const Allocator = std.mem.Allocator;
 
 const TypeIdData = struct {
@@ -49,14 +50,103 @@ pub fn getComponentFlag(comptime T: type) u32 {
     return innerTypeId(T).flag;
 }
 
+pub fn getComponentFlags(comptime fields: []const type) u32 {
+    var flags: [fields.len]u32 = undefined;
+    inline for (0..fields.len) |index| {
+        const field = fields[index];
+        flags[index] = getComponentFlag(field);
+    }
+
+    var res: u32 = 0;
+    for (flags) |flag| {
+        res |= flag;
+    }
+    return res;
+}
+
+pub fn generateStruct(comptime types: []const type) type {
+    var fields: [types.len]std.builtin.Type.StructField = undefined;
+
+    inline for (0.., types) |i, ctype| {
+        //var iter = std.mem.splitBackwardsScalar(u8, @typeName(ctype), '.');
+
+        const name = std.fmt.comptimePrint("elem_{d}", .{i});
+        fields[i] = .{
+            .name = name,
+            .type = *ctype,
+            .default_value_ptr = null,
+            .is_comptime = false,
+            .alignment = @alignOf(ctype),
+        };
+    }
+
+    return @Type(.{
+        .@"struct" = .{
+            .layout = .auto,
+            .fields = &fields,
+            .decls = &[_]std.builtin.Type.Declaration{},
+            .is_tuple = false,
+        },
+    });
+}
+
 const EntityImpl = struct {
-    index: u32,
-    components: u32,
+    content: ?struct {
+        index: u32,
+        components: u32,
+        version: u32,
+    },
+
+    pub fn getIndex(self: @This()) EcsError!u32 {
+        if (self.content) |c| {
+            return @intCast(c.index);
+        }
+        return error.EntityNotExist;
+    }
+
+    pub fn getVersion(self: @This()) EcsError!u32 {
+        if (self.content) |c| {
+            return @intCast(c.version);
+        }
+        return error.EntityNotExist;
+    }
+
+    pub fn getComponents(self: @This()) EcsError!u32 {
+        if (self.content) |c| {
+            return c.components;
+        }
+        return error.EntityNotExist;
+    }
+
+    pub fn isAlive(self: @This()) bool {
+        return self.content != null;
+    }
+
+    pub fn hasComponent(self: @This(), comptime T: type) bool {
+        return (self.content.?.components & getComponentFlag(T)) != 0;
+    }
+
+    pub fn hasComponents(self: @This(), comptime types: []const type) bool {
+        const flags = getComponentFlags(types);
+        return (self.content.?.components & flags) == flags;
+    }
+
+    fn setComponent(self: *@This(), components: u32) void {
+        std.debug.print("set components {d}\n", .{components});
+        self.content.?.components = components;
+    }
+
+    fn addComponent(self: *@This(), component: u32) void {
+        //std.debug.print("add components {d}\n", .{component});
+        self.content.?.components |= component;
+    }
 };
 
 pub const Entity = *EntityImpl;
 
 const EcsError = error{
+    EntityNotExist,
+    ComponentAlreadyAdded,
     ComponetNotContains,
 };
 
@@ -71,252 +161,130 @@ pub const Component = struct {
     }
 };
 
-fn makeBucket(comptime T: type) type {
-    const Bucket = struct {
-        const Self = @This();
-        const Count = 32;
-        const AddResult = struct { ptr: *T, pos: u32 };
-        const GetItemError = error{
-            OutOfBounds,
-            NotAlive,
-        };
-
-        fn makeBucketIterator() type {
-            return struct {
-                const Container = Self;
-                const Empty: @This() = .{
-                    .container = null,
-                    .index = 0,
-                };
-                container: ?*Container,
-                index: usize,
-
-                fn next(self: @This()) @This() {
-                    const nextIndex = self.index + 1;
-                    std.debug.print("next index {d}\n", .{nextIndex});
-                    if (nextIndex >= Count) {
-                        return Empty;
-                    }
-                    return .{
-                        .container = self.container,
-                        .index = nextIndex,
-                    };
-                }
-
-                fn findNextAlive(self: @This()) usize {
-                    if (self.container) |container| {
-                        const alives = container.alives;
-                        if (alives == 0) {
-                            //std.debug.print("alives {d}\n", .{alives});
-                            return Count;
-                        }
-
-                        const shift: u32 = @intCast(self.index);
-                        var it = std.math.pow(u32, 2, shift);
-                        var index = self.index;
-                        while ((alives & it) == 0) {
-                            it <<= 1;
-                            index += 1;
-                            //std.debug.print("it {d} index {d}\n", .{ it, index });
-                            if (index >= Count) {
-                                break;
-                            }
-                        }
-                        return index;
-                    }
-                    return Count;
-                }
-
-                fn get(self: *@This()) ?*T {
-                    if (self.container) |container| {
-                        return container.get(self.index);
-                    }
-                    return null;
-                }
-
-                fn isEnd(self: @This()) bool {
-                    return self.container == null;
-                }
-            };
-        }
-
-        const Iterator = makeBucketIterator();
-        allocator: Allocator,
-        alives: u32,
-        components: []T,
-
-        fn init(gpa: Allocator) !Self {
-            return .{
-                .allocator = gpa,
-                .alives = 0,
-                .components = try gpa.alloc(T, Count),
-            };
-        }
-
-        fn deinit(self: Self) void {
-            self.allocator.free(self.components);
-        }
-
-        fn getIterator(self: *Self) Iterator {
-            return .{
-                .container = self,
-                .index = 0,
-            };
-        }
-
-        fn get(self: Self, index: usize) ?*T {
-            std.debug.print("get from bucket {}\n", .{index});
-            if (index >= self.components.len) {
-                return null;
-            }
-            const place = std.math.pow(u32, 2, @intCast(index));
-            if ((self.alives & place) == 0) {
-                return null;
-            }
-
-            return &self.components[index];
-        }
-
-        fn isFull(self: Self) bool {
-            return self.alives == std.math.maxInt(u32);
-        }
-
-        fn allocOrGet(self: *Self, pos: u32) *T {
-            const index = pos % Count;
-            const bit: u32 = std.math.pow(u32, 2, index);
-
-            if ((bit & self.alives) != 0) {
-                return &self.components[index];
-            }
-
-            return self.alloc(pos);
-        }
-
-        fn alloc(self: *Self, pos: u32) *T {
-            const index = pos % Count;
-            const bit: u32 = std.math.pow(u32, 2, index);
-
-            std.debug.assert((bit & self.alives) == 0);
-            self.alives |= bit;
-            std.debug.print("alloc pos {d} index {d} alives {d}\n", .{ pos, index, self.alives });
-
-            return &self.components[index];
-        }
-
-        fn allocOne(self: *Self) !AddResult {
-            for (0..Count) |index| {
-                const bit: u32 = std.math.pow(u32, 2, @intCast(index));
-                if ((bit & self.alives) == 0) {
-                    return .{ .ptr = self.alloc(@intCast(index)), .pos = @intCast(index) };
-                }
-            }
-
-            unreachable;
-        }
-
-        fn freeByIndex(self: *Self, pos: u32) void {
-            const index = pos % Count;
-            const bit: u32 = std.math.pow(u32, 2, index);
-
-            self.alives ^= bit;
-        }
-
-        fn free(self: *Self, ptr: *T) void {
-            const index = ptr.index % Count;
-            const bit: u32 = std.math.pow(u32, 2, index);
-
-            self.alives ^= bit;
-        }
-    };
-
-    return Bucket;
-}
-
 fn baseStorage(comptime T: type) type {
     return struct {
         const Self = @This();
-        const Bucket = makeBucket(T);
-        const Node = struct {
-            next: ?*@This() = null,
-            bucket: makeBucket(T),
+        pub const Bucket = OutBucket.makeBucket(T, std.heap.pageSize() / @sizeOf(T));
+
+        const Iterator = struct {
+            const Container = Self;
+            const This = @This();
+            container: *Container,
+            index: usize = 0,
+            item_iter: Bucket.Iterator,
+
+            fn next(self: @This()) ?@This() {
+                if (self.item_iter.next()) |iter| {
+                    return .{
+                        .container = self.container,
+                        .index = self.index,
+                        .item_iter = iter,
+                    };
+                }
+
+                const buckets = self.container.buckets.items.len;
+                const next_index = self.index + 1;
+                std.debug.print("next index {d}\n", .{next_index});
+                if (next_index >= buckets) {
+                    return null;
+                }
+
+                return .{
+                    .container = self.container,
+                    .index = next_index,
+                    .item_iter = self.container.buckets.items[next_index].getIterator(),
+                };
+            }
+
+            fn get(self: @This()) *T {
+                return self.item_iter.get();
+            }
         };
 
         allocator: Allocator,
-        head: *Node,
-        tail: ?*Node,
+        buckets: std.ArrayList(Bucket),
 
-        fn init(allocator: Allocator) !Self {
-            const head = try allocator.create(Node);
-            head.* = .{
-                .bucket = try Bucket.init(allocator),
-            };
+        pub fn init(allocator: Allocator) !Self {
+            var buckets: std.ArrayList(Bucket) = .empty;
+            const bucket = try buckets.addOne(allocator);
 
+            bucket.* = try Bucket.init(allocator);
             return .{
                 .allocator = allocator,
-                .head = head,
-                .tail = head,
+                .buckets = buckets,
             };
         }
 
-        fn deinit(self: Self) void {
-            var it: ?*Node = self.head;
-            while (it) |node| {
-                node.bucket.deinit();
-                self.allocator.destroy(node);
-                it = node.next;
+        pub fn deinit(self: *Self) void {
+            for (self.buckets.items) |item| {
+                item.deinit();
+            }
+            self.buckets.deinit(self.allocator);
+        }
+
+        fn grow(self: *Self, new_len: usize) !void {
+            const elements = self.buckets.items.len;
+            if (new_len > elements) {
+                try self.buckets.resize(self.allocator, new_len);
+
+                for (elements..new_len) |index| {
+                    self.buckets.items[index] = try Bucket.init(self.allocator);
+                }
             }
         }
 
-        fn grow(self: *Self) !*Node {
-            if (self.tail) |tail| {
-                const next = try self.allocator.create(Node);
-                next.* = .{
-                    .bucket = try Bucket.init(self.allocator),
+        fn growAlloc(self: *Self) ?Bucket.AddResult {
+            const new_bucket = self.buckets.addOne(self.allocator) catch {
+                return null;
+            };
+            new_bucket.* = Bucket.init(self.allocator) catch {
+                return null;
+            };
+            return new_bucket.allocOne();
+        }
+
+        pub fn addOne(self: *Self) ?Bucket.AddResult {
+            const elements = self.buckets.items.len;
+            if (elements == 0) {
+                return self.growAlloc();
+            } else {
+                var bucket = &self.buckets.items[elements - 1];
+                if (bucket.isFull()) {
+                    return self.growAlloc();
+                }
+                return bucket.allocOne();
+            }
+            return null;
+        }
+
+        pub fn getIterator(self: *Self) Iterator {
+            return .{
+                .container = self,
+                .index = 0,
+                .item_iter = self.buckets.items[0].getIterator(),
+            };
+        }
+
+        pub fn getItem(self: *Self, index: usize) ?*T {
+            const bucket: usize = @intFromFloat(std.math.floor(@as(f64, @floatFromInt(index)) / Bucket.Count));
+            if (bucket < self.buckets.items.len) {
+                const inside_index = index % Bucket.Count;
+                return &self.buckets.items[bucket].elements[inside_index];
+            }
+            return null;
+        }
+
+        pub fn allocInplace(self: *Self, index: usize) ?*T {
+            const bucket: usize = @intFromFloat(std.math.floor(@as(f64, @floatFromInt(index)) / Bucket.Count));
+            const current_len = self.buckets.items.len;
+            if (bucket > current_len) {
+                const new_len = bucket + 1;
+                self.grow(new_len) catch {
+                    return null;
                 };
-                self.tail = next;
-                tail.next = next;
-                return next;
             }
-            unreachable;
-        }
-
-        fn getNodeToAdd(self: *Self) !*Node {
-            var it: ?*Node = self.head;
-            while (it) |node| {
-                if (!node.bucket.isFull()) {
-                    return node;
-                }
-                it = node.next;
-            }
-            return try self.grow();
-        }
-
-        fn getNodeByIndex(self: *Self, index: u32) ?*Node {
-            var it: ?*Node = &self.head;
-            var counter: u32 = 0;
-            while (it) |node| {
-                it = node.next;
-                if (counter == index) {
-                    return it;
-                }
-                counter += 1;
-            }
-            return null;
-        }
-
-        fn addOne(self: *Self) !Bucket.AddResult {
-            const node = try self.getNodeToAdd();
-
-            return node.bucket.allocOne();
-        }
-
-        fn addInPlace(self: *Self, pos: u32) ?*T {
-            const bucket_index = @as(f32, @floatFromInt(pos)) / Bucket.Count;
-
-            if (self.getNodeByIndex(bucket_index)) |node| {
-                return node.bucket.alloc(pos);
-            }
-            return null;
+            const inside_index = index % Bucket.Count;
+            return &self.buckets.items[bucket].elements[inside_index];
         }
     };
 }
@@ -327,85 +295,30 @@ const ComponentContainer = struct {
 };
 
 fn makeContainer(comptime T: type) type {
-    const Container = struct {
+    return struct {
         const Self = @This();
-        const Bucket = makeBucket(T);
-        const Iterator = makeIterator(T);
-        buckets: std.ArrayList(Bucket),
+        pub const Storage = baseStorage(T);
+        pub const Iterator = Storage.Iterator;
         allocator: Allocator,
-
-        fn makeIterator(comptime Item: type) type {
-            return struct {
-                const Container = Self;
-                const This = @This();
-                container: ?*Container,
-                bucket_index: usize = 0,
-                item_iter: Bucket.Iterator,
-
-                pub fn next(self: *This) This {
-                    if (self.container) |container| {
-                        //std.debug.print("next bucket index {d}", .{self.bucketIndex});
-                        const next_iter = self.item_iter.next();
-                        if (!next_iter.isEnd()) {
-                            return .{
-                                .container = container,
-                                .bucket_index = self.bucket_index,
-                                .item_iter = next_iter,
-                            };
-                        }
-
-                        const newBucket = self.bucket_index + 1;
-                        if (newBucket < container.buckets.items.len) {
-                            return .{
-                                .container = container,
-                                .bucket_index = newBucket,
-                                .item_iter = container.buckets.items[newBucket].getIterator(),
-                            };
-                        }
-                    }
-                    //std.debug.print("end bucket index {d}", .{self.bucketIndex});
-                    return .{
-                        .container = null,
-                        .bucket_index = 0,
-                        .item_iter = Bucket.Iterator.Empty,
-                    };
-                }
-
-                pub fn get(self: *This) ?*Item {
-                    std.debug.print("container iter get {d}\n", .{self.item_iter.index});
-                    return self.item_iter.get();
-                }
-
-                pub fn isEnd(self: This) bool {
-                    return self.container == null;
-                }
-            };
-        }
+        storage: Storage,
 
         fn getIterator(self: *Self) Iterator {
-            return .{
-                .container = self,
-                .bucket_index = 0,
-                .item_iter = self.buckets.items[0].getIterator(),
-            };
+            return self.getIterator();
         }
 
         fn create(gpa: Allocator) !*Self {
             const container = try gpa.create(Self);
 
             container.* = .{
-                .buckets = std.ArrayList(Bucket).init(gpa),
                 .allocator = gpa,
+                .storage = try Storage.init(gpa),
             };
 
             return container;
         }
 
         fn destroy(self: *Self) void {
-            for (self.buckets.items) |bucket| {
-                bucket.deinit();
-            }
-            self.buckets.deinit();
+            self.storage.deinit();
             self.allocator.destroy(self);
         }
 
@@ -422,81 +335,127 @@ fn makeContainer(comptime T: type) type {
             };
         }
 
-        fn getBucketIndex(entity: Entity) usize {
-            const bucket_index: usize = @intFromFloat(std.math.floor(@as(f32, @floatFromInt(entity.index)) / Bucket.Count));
+        fn getComponent(self: *Self, entity: Entity) EcsError!*T {
+            const index = try entity.getIndex();
 
-            return bucket_index;
+            if (self.storage.getItem(index)) |comp| {
+                return comp;
+            }
+            return error.ComponetNotContains;
         }
 
-        fn getComponent(self: *Self, entity: Entity) *T {
-            const bucket_index = getBucketIndex(entity);
-            std.debug.assert(self.buckets.items.len > bucket_index);
-
-            const bucket = &self.buckets.items[bucket_index];
-            return bucket.allocOrGet(entity.index);
-        }
-
-        fn addComponent(self: *Self, entity: Entity) !*T {
-            const bucket_index = getBucketIndex(entity);
-            std.debug.print("alloc new bucket {d}\n", .{bucket_index});
-            if (self.buckets.items.len <= bucket_index) {
-                const last = self.buckets.items.len;
-                try self.buckets.resize(bucket_index + 1);
-
-                for (last..self.buckets.items.len) |index| {
-                    self.buckets.items[index] = try Bucket.init(self.allocator);
-                }
+        fn addComponent(self: *Self, entity: Entity) anyerror!*T {
+            if (!entity.isAlive()) {
+                return error.EntityNotExist;
             }
 
-            std.debug.print("alloc new bucket {d}\n", .{bucket_index});
-            var bucket = &self.buckets.items[bucket_index];
-            const comp = bucket.allocOrGet(entity.index);
-            comp.* = T.init();
-            entity.components |= getComponentFlag(T);
-            return comp;
-        }
+            if (entity.hasComponent(T)) {
+                return error.ComponentAlreadyAdded;
+            }
 
-        fn removeComponent(self: *Self, entity: Entity) void {
-            const bucket_index = getBucketIndex(entity);
-            std.debug.assert(self.buckets.items.len > bucket_index);
+            const index = try entity.getIndex();
+            const opt_comp = self.storage.getItem(index) orelse self.storage.allocInplace(index);
 
-            self.buckets.items[bucket_index].free(entity.index);
+            if (opt_comp) |comp| {
+                comp.* = T.init();
+                entity.addComponent(getComponentFlag(T));
+                return comp;
+            }
+
+            unreachable;
+            //return error.ComponetNotContains;
         }
     };
-
-    return Container;
 }
 
-const Entities = struct {
+pub const Entities = struct {
     const Self = @This();
     const BaseStorage = baseStorage(EntityImpl);
 
     storage: BaseStorage,
+    free_entities: std.ArrayList(@Vector(2, u32)),
     allocator: Allocator,
-    counter: u32 = 0,
 
-    const Iterator = struct {
-        index: u32,
+    pub const Iterator = struct {
+        container: *Self,
+        iter: BaseStorage.Iterator,
+
+        pub fn next(self: @This()) ?@This() {
+            var iter = self.iter.next();
+            while (iter) |next_iter| {
+                const ent = next_iter.get();
+                if (ent.isAlive()) {
+                    return .{
+                        .container = self.container,
+                        .iter = next_iter,
+                    };
+                }
+                iter = next_iter.next();
+            }
+            return null;
+        }
+
+        pub fn get(self: @This()) Entity {
+            return self.iter.get();
+        }
     };
 
     fn init(gpa: Allocator) !Self {
         return Self{
             .storage = try BaseStorage.init(gpa),
+            .free_entities = .empty,
             .allocator = gpa,
         };
     }
 
-    fn deinit(self: Self) void {
+    fn deinit(self: *Self) void {
         self.storage.deinit();
+        self.free_entities.deinit(self.allocator);
     }
 
     fn makeEntity(self: *Self) !Entity {
-        const res = try self.storage.addOne();
-        res.ptr.* = .{
-            .index = res.pos,
-            .components = 0,
+        if (self.free_entities.pop()) |info| {
+            if (self.getEntity(info[0])) |ent| {
+                ent.content = .{
+                    .index = info[0],
+                    .components = 0,
+                    .version = info[1] + 1,
+                };
+                return ent;
+            }
+        }
+
+        if (self.storage.addOne()) |res| {
+            res.ptr.* = .{ .content = .{
+                .index = res.pos,
+                .components = 0,
+                .version = 0,
+            } };
+            return res.ptr;
+        }
+        unreachable;
+    }
+
+    fn killEntity(self: *Self, entity: Entity) void {
+        if (entity.isAlive()) {
+            const index = entity.getIndex() catch unreachable;
+            const version = entity.getVersion() catch unreachable;
+            self.free_entities.append(self.allocator, .{ index, version }) catch {
+                unreachable;
+            };
+            entity.content = null;
+        }
+    }
+
+    fn getEntity(self: *Self, index: u32) ?Entity {
+        return self.storage.getItem(@intCast(index));
+    }
+
+    pub fn getIterator(self: *Self) Iterator {
+        return .{
+            .container = self,
+            .iter = self.storage.getIterator(),
         };
-        return res.ptr;
     }
 };
 
@@ -510,7 +469,7 @@ pub const Ecs = struct {
     pub fn init(gpa: Allocator) !Ecs {
         return .{
             .allocator = gpa,
-            .components = std.ArrayList(ComponentContainer).init(gpa),
+            .components = .empty,
             .entities = try Entities.init(gpa),
         };
     }
@@ -521,45 +480,91 @@ pub const Ecs = struct {
             cont.destroy_func(cont.ptr);
         }
 
-        self.components.deinit();
+        self.components.deinit(self.allocator);
     }
 
     pub fn makeEntity(self: *Self) !Entity {
         return self.entities.makeEntity();
     }
 
-    fn getContainer(self: *Self, comptime T: type) !*makeContainer(T) {
-        const Container = makeContainer(T);
+    pub fn killEntity(self: *Self, entity: Entity) void {
+        self.entities.killEntity(entity);
+    }
 
-        const index = initTypeIndex(T);
+    pub fn getEntity(self: *Self, index: u32) ?Entity {
+        return self.entities.getEntity(index);
+    }
+
+    fn getContainer(self: *Self, comptime T: type) ?*makeContainer(T) {
+        //const Container = makeContainer(T);
+
+        const index = typeIndex(T);
         if (self.components.items.len <= index) {
-            const container = try Container.create(self.allocator);
-            try self.components.append(container.getComponentContainer());
+            //const container = try Container.create(self.allocator);
+            //try self.components.append(container.getComponentContainer());
+            return null;
         }
 
         return @ptrCast(@alignCast(self.components.items[index].ptr));
     }
 
+    fn grow(self: *Self, comptime T: type) !void {
+        const Container = makeContainer(T);
+
+        const index = initTypeIndex(T);
+        if (self.components.items.len <= index) {
+            const container = try Container.create(self.allocator);
+            try self.components.append(self.allocator, container.getComponentContainer());
+        }
+    }
+
     pub fn addComponent(self: *Self, comptime T: type, entity: Entity) !*T {
-        const container = try self.getContainer(T);
+        try self.grow(T);
+        const container = self.getContainer(T);
 
-        return container.addComponent(entity);
+        return container.?.addComponent(entity);
     }
 
-    pub fn removeComponent(self: Self, comptime T: type, entity: Entity) !void {
-        const container = try self.getContainer(T);
-        container.removeComponent(entity);
+    pub fn removeComponent(self: *Self, comptime T: type, entity: Entity) EcsError!void {
+        const component_flag = getComponentFlag(T);
+
+        var comps = try entity.getComponents();
+        std.debug.print("removeComponent comps: {d}, component_flag: {d}\n", .{ comps, component_flag });
+        comps ^= component_flag;
+        entity.setComponent(comps);
+        //container.removeComponent(entity);
+
+        const container = self.getContainer(T);
+        const comp = try container.?.getComponent(entity);
+        comp.*.deinit();
     }
 
-    pub fn getComponent(self: Self, comptime T: type, entity: Entity) !*T {
-        const container = try self.getContainer(T);
-
-        return container.getComponent(entity);
+    pub fn getComponent(self: *Self, comptime T: type, entity: Entity) EcsError!*T {
+        if (!entity.isAlive()) {
+            return error.EntityNotExist;
+        }
+        if (self.getContainer(T)) |container| {
+            return try container.getComponent(entity);
+        }
+        return error.ComponetNotContains;
     }
 
-    pub fn getIterator(self: *Self, comptime T: type) !makeContainer(T).Iterator {
-        const container = try self.getContainer(T);
-
-        return container.getIterator();
+    pub fn getComponents(self: *Self, comptime Args: []const type, entity: Entity) EcsError!generateStruct(Args) {
+        if (!entity.isAlive()) {
+            return error.EntityNotExist;
+        }
+        const S = generateStruct(Args);
+        const fields = std.meta.fields(S);
+        var res: S = undefined;
+        inline for (fields, 0..) |field, i| {
+            const child_type = switch (@typeInfo(field.type)) {
+                .pointer => |info| info.child,
+                else => @compileError("Expected a pointer type"),
+            };
+            if (self.getContainer(child_type)) |container| {
+                @field(&res, std.fmt.comptimePrint("elem_{d}", .{i})) = try container.getComponent(entity);
+            }
+        }
+        return res;
     }
 };

@@ -55,14 +55,12 @@ pub fn readFileData(gpa: std.mem.Allocator, file_path: []const u8) ![]u8 {
     var file = try std.fs.cwd().openFile(file_path, .{});
     defer file.close();
 
-    var stream = std.io.StreamSource{ .file = file };
-    return try stream.reader().readAllAlloc(gpa, std.math.maxInt(usize));
+    return try file.readToEndAlloc(gpa, std.math.maxInt(usize));
 }
 
 pub fn writeFileData(file_path: []const u8, bytes: []const u8) !void {
     var file = try std.fs.cwd().openFile(file_path, .{ .mode = .write_only });
     defer file.close();
 
-    var stream = std.io.StreamSource{ .file = file };
-    _ = try stream.write(bytes);
+    _ = try file.write(bytes);
 }

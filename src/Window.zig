@@ -6,6 +6,7 @@ const glfw = @cImport({
 });
 var buffer: [1024]u8 = undefined;
 var window_allocator: std.heap.FixedBufferAllocator = .init(&buffer);
+const allocator = window_allocator.allocator();
 
 pub const MouseButtonState = enum(c_int) {
     Press = glfw.GLFW_PRESS,
@@ -28,7 +29,7 @@ pub const MouseBtnEvent = struct {
     state: MouseButtonState,
 };
 
-var windows: std.ArrayList(Window) = .init(window_allocator.allocator());
+var windows: std.ArrayList(Window) = .empty; //(window_allocator.allocator());
 
 window: ?*glfw.GLFWwindow,
 mouse_events: std.ArrayList(MouseBtnEvent),
@@ -43,7 +44,7 @@ fn mouseCallback(window: ?*glfw.GLFWwindow, button: c_int, action: c_int, _: c_i
     }
 }
 
-pub fn create(gpa: std.mem.Allocator, width: u32, height: u32, title: []const u8) !*Window {
+pub fn create(_: std.mem.Allocator, width: u32, height: u32, title: []const u8) !*Window {
     glfw.glfwWindowHint(glfw.GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfw.glfwWindowHint(glfw.GLFW_CONTEXT_VERSION_MINOR, 3);
     const window = glfw.glfwCreateWindow(
@@ -63,16 +64,16 @@ pub fn create(gpa: std.mem.Allocator, width: u32, height: u32, title: []const u8
         mouseCallback,
     );
 
-    try windows.append(.{
+    try windows.append(window_allocator.allocator(), .{
         .window = window,
-        .mouse_events = .init(gpa),
+        .mouse_events = .empty,
     });
 
     return &windows.items[windows.items.len - 1];
 }
 
-pub fn destroy(self: Window) void {
-    self.mouse_events.deinit();
+pub fn destroy(self: *Window) void {
+    self.mouse_events.deinit(allocator);
     glfw.glfwDestroyWindow(self.window);
 }
 
@@ -92,7 +93,7 @@ pub fn frameEnd(self: Window) void {
 
 fn onMouseAction(self: *Window, btn: c_int, action: c_int) !void {
     self.mouse_button_state[@intCast(btn)] = action == glfw.GLFW_PRESS;
-    try self.mouse_events.append(.{
+    try self.mouse_events.append(allocator, .{
         .btn = @enumFromInt(btn),
         .state = @enumFromInt(action),
     });

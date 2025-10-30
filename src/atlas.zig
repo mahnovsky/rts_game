@@ -333,7 +333,7 @@ pub const Atlas = struct {
         }
 
         if (image.pixelFormat().isIndexed()) {
-            try image.convert(.rgba32);
+            try image.convert(gpa, .rgba32);
         }
 
         const texture = opengl.Texture.init(

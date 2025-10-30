@@ -7,6 +7,7 @@ const Game = @import("Game.zig");
 const shaders = @import("shaders.zig");
 const Editor = @import("editor.zig").Editor;
 const Window = @import("Window.zig");
+const Utils = @import("utils.zig");
 
 const gl = @cImport({
     @cInclude("glad/glad.h");
@@ -87,25 +88,22 @@ pub const App = struct {
         };
 
         defer file.close();
-        var stream = std.io.StreamSource{ .file = file };
-        const bytes = stream.reader().readAllAlloc(allocator, std.math.maxInt(usize)) catch |err| {
-            warn("error {s}", .{@errorName(err)});
-            return error.FailedInitOpenGL;
-        };
+
+        const bytes = try Utils.readFileData(allocator, "./data/GoNotoCurrent-Regular.ttf");
         defer allocator.free(bytes);
 
         var font_atlas = try Atlas.initFromFont(allocator, 32, 96, bytes);
         defer font_atlas.deinit(allocator);
 
-        var fonts = std.ArrayList([]u8).init(allocator);
+        var fonts: std.ArrayList([]u8) = .empty;
         defer {
             for (fonts.items) |font_name| {
                 allocator.free(font_name);
             }
-            fonts.deinit();
+            fonts.deinit(allocator);
         }
 
-        try fonts.append(try allocator.dupe(u8, "GoNotoCurrent-Regular.ttf"));
+        try fonts.append(allocator, try allocator.dupe(u8, "GoNotoCurrent-Regular.ttf"));
         const text_render = try tr.TextRender.init(
             allocator,
             fonts,

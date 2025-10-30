@@ -3,6 +3,7 @@ const Atlas = @import("atlas.zig").Atlas;
 const Rect = @import("atlas.zig").Rect;
 const opengl = @import("opengl.zig");
 const tt = @import("TrueType");
+const Utils = @import("utils.zig");
 
 const warn = std.log.warn;
 
@@ -67,11 +68,8 @@ pub const TextRender = struct {
             std.mem.copyForwards(u8, file_path, base_path);
             std.mem.copyForwards(u8, file_path[base_path.len..], font_name);
             std.log.debug("file_path {s}", .{file_path});
-            var file = try std.fs.cwd().openFile(file_path, .{});
-            defer file.close();
 
-            var stream = std.io.StreamSource{ .file = file };
-            const bytes = try stream.reader().readAllAlloc(gpa, std.math.maxInt(usize));
+            const bytes = try Utils.readFileData(gpa, file_path);
             defer gpa.free(bytes);
 
             const font_atlas = try Atlas.initFromFont(gpa, 32, 96, bytes);

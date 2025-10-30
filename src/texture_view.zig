@@ -73,7 +73,7 @@ pub const TextureViewWindow = struct {
     texture_view: TextureView,
     editor: *ed.Editor,
 
-    pub fn init(gpa: std.mem.Allocator, atl: *const atlas.Atlas, orig: ?*glfw.GLFWwindow, editor: *ed.Editor) !Self {
+    pub fn init(gpa: std.mem.Allocator, atl: *const atlas.Atlas, orig: *anyopaque, editor: *ed.Editor) !Self {
         glfw.glfwWindowHint(glfw.GLFW_CONTEXT_VERSION_MAJOR, 3);
         glfw.glfwWindowHint(glfw.GLFW_CONTEXT_VERSION_MINOR, 3);
         const window = glfw.glfwCreateWindow(
@@ -81,7 +81,7 @@ pub const TextureViewWindow = struct {
             @intCast(atl.texture_height),
             "Texture View",
             null,
-            orig,
+            @ptrCast(orig),
         );
 
         glfw.glfwMakeContextCurrent(window);

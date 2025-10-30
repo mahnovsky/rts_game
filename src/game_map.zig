@@ -109,10 +109,10 @@ pub const YamlSerializer = struct {
     }
 
     fn save(gpa: Allocator, map_data: *const MapData) []u8 {
-        var list = std.ArrayList(u8).init(gpa);
-        yaml.stringify(gpa, map_data.*, list.writer()) catch return &.{};
+        var list: std.ArrayList(u8) = .empty;
+        yaml.stringify(gpa, map_data.*, list.writer(gpa)) catch return &.{};
 
-        return list.toOwnedSlice() catch &.{};
+        return list.toOwnedSlice(gpa) catch &.{};
     }
 };
 
@@ -224,8 +224,9 @@ pub const GameMap = struct {
     map_render: opengl.DrawingObject,
 
     pub fn init(gpa: std.mem.Allocator, atlas_path: []const u8, map_data: MapData, proj: zm.Mat4f) !Self {
-        var image = try zigimg.Image.fromFilePath(gpa, atlas_path);
-        defer image.deinit();
+        var read_buffer: [zigimg.io.DEFAULT_BUFFER_SIZE]u8 = undefined;
+        var image = try zigimg.Image.fromFilePath(gpa, atlas_path, read_buffer[0..]);
+        defer image.deinit(gpa);
 
         const program = try opengl.Program.init(shaders.map_vshader, shaders.fshader);
         program.use();

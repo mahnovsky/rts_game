@@ -24,21 +24,25 @@
     // Once all dependencies are fetched, `zig build` no longer requires
     // internet connectivity.
     .dependencies = .{
-        .yaml = .{
-            .url = "https://github.com/kubkon/zig-yaml/archive/refs/tags/0.1.1.tar.gz",
-            .hash = "zig_yaml-0.1.0-C1161miEAgBCwL3YAEQZwV_4GyaaT2Xqj9nKB6hNe_TL",
-        },
+        // .yaml = .{
+        //     .url = "https://github.com/kubkon/zig-yaml/archive/refs/tags/0.1.1.tar.gz",
+        //     .hash = "zig_yaml-0.1.0-C1161miEAgBCwL3YAEQZwV_4GyaaT2Xqj9nKB6hNe_TL",
+        // },
         .zm = .{
-            .url = "git+https://github.com/griush/zm#27ee118800e6ee0804499d053a54100beb579bf3",
-            .hash = "zm-0.3.0-cLX-WY3PAABvjPwxqDx9GZkMixyyrlHueLZTxpGy3kLE",
+            .url = "git+https://github.com/griush/zm#b5d70485dfc78baa9251a06a844d860fd00e9bcf",
+            .hash = "zm-0.4.0-cLX-WdndAACqPRGqhCAsd65iTajgaVVwrXhoLUQFKTOt",
         },
         .zigimg = .{
-            .url = "git+https://github.com/zigimg/zigimg.git#31bd433201d12d6aa700074d751a7db4555cdb0d",
-            .hash = "zigimg-0.1.0-8_eo2qClEgC8dTSiSO6vqGe7mdtIkobGi-Uc4d0Eo7_2",
+            .url = "git+https://github.com/zigimg/zigimg.git#f5783e87627cbd9e0b45fad112e9f73503914f36",
+            .hash = "zigimg-0.1.0-8_eo2vBrFQBhsrLpexdcDQY-zrlzkyFZfKuYX-Nry6KN",
         },
         .TrueType = .{
-            .url = "git+https://codeberg.org/andrewrk/TrueType.git#4871d8bc019abaa241bf27a0507a33cb6edbcc6e",
-            .hash = "TrueType-0.0.0-Ne-mWPAFAQDPIZm1LKD1qr3bxcc-TpgB_4aHLAchHFrp",
+            .url = "git+https://codeberg.org/andrewrk/TrueType.git#7543e2dca70267e8f09e37be00fbc0385138581d",
+            .hash = "TrueType-0.0.0-Ne-mWHIGAQBwHsiS9z_vbr1SkVZCkG01Vpzrs079dzIO",
+        },
+        .zig_yaml = .{
+            .url = "https://github.com/kubkon/zig-yaml/archive/refs/tags/0.1.1.tar.gz",
+            .hash = "zig_yaml-0.1.0-C1161miEAgBCwL3YAEQZwV_4GyaaT2Xqj9nKB6hNe_TL",
         },
     },
     .paths = .{

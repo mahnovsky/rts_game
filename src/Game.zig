@@ -103,9 +103,29 @@ pub fn postInit(game: *Game) !void {
                 .pos = 0,
             };
         }
+        pub fn deinit(self: *Self) void {
+            self.pos = 0.0;
+        }
     };
 
     const Transform = struct {
+        const Self = @This();
+        component: ecs.Component,
+        pos: f32,
+
+        pub fn init() Self {
+            return .{
+                .component = ecs.Component.init(Self),
+                .pos = 0,
+            };
+        }
+
+        pub fn deinit(self: *Self) void {
+            self.pos = 0.0;
+        }
+    };
+
+    const Sprite = struct {
         const Self = @This();
         component: ecs.Component,
         pos: f32,
@@ -121,24 +141,62 @@ pub fn postInit(game: *Game) !void {
     for (0..20) |_| {
         const ent = try game.ecs_inst.makeEntity();
 
-        _ = try game.ecs_inst.addComponent(Transform, ent);
-        _ = try game.ecs_inst.addComponent(Movable, ent);
+        var tr = try game.ecs_inst.addComponent(Transform, ent);
+        tr.pos = 12;
+        var mv = try game.ecs_inst.addComponent(Movable, ent);
+        mv.pos = 44;
     }
-    var tr_iter = try game.ecs_inst.getIterator(Transform);
-    var mv_iter = try game.ecs_inst.getIterator(Movable);
-    var i: u32 = 0;
-    while (!mv_iter.isEnd() and !tr_iter.isEnd()) {
-        const tr = tr_iter.get();
-        const mv = mv_iter.get();
-        if (tr != null and mv != null) {
-            std.debug.print("Movable iteration {d}\n", .{i});
-            i += 1;
 
-            tr.?.pos += mv.?.pos;
-        }
-        tr_iter = tr_iter.next();
-        mv_iter = mv_iter.next();
+    if (game.ecs_inst.getEntity(12)) |ent_12| {
+        std.debug.print("added sprite to ent {d}\n", .{try ent_12.getIndex()});
+        _ = try game.ecs_inst.addComponent(Sprite, ent_12);
+        var tr = try game.ecs_inst.getComponent(Transform, ent_12);
+        tr.pos = 8;
+        //_ = try game.ecs_inst.removeComponent(Movable, ent_12);
+        game.ecs_inst.killEntity(ent_12);
     }
+
+    const ent = try game.ecs_inst.makeEntity();
+    _ = try game.ecs_inst.addComponent(Transform, ent);
+    _ = try game.ecs_inst.addComponent(Movable, ent);
+    _ = try game.ecs_inst.addComponent(Sprite, ent);
+    //const Tuple = std.meta.Tuple;
+    const flags = ecs.getComponentFlags(&.{ Transform, Movable });
+    std.debug.print("Flags comps: {d}\n", .{flags});
+    //const components = ecs.getComponentFlag(Transform) | ecs.getComponentFlag(Movable);
+    var en_it: ?ecs.Entities.Iterator = game.ecs_inst.entities.getIterator();
+    //const Res = ecs.generateStruct(&.{ Transform, Movable, Sprite });
+    while (en_it) |it| {
+        const index = try it.get().getIndex();
+        const comps = try it.get().getComponents();
+        std.debug.print("Entity iteration id: {d}, comps: {d}\n", .{ index, comps });
+
+        if ((comps & flags) == flags) {
+            //const tr = try game.ecs_inst.getComponent(Transform, it.get());
+            //const mv = try game.ecs_inst.getComponent(Movable, it.get());
+            //const d = try game.ecs_inst.getComponents(try ecs.generateStruct(&.{ Transform, Movable }), it.get());
+            const d = try game.ecs_inst.getComponents(&.{ Transform, Movable }, it.get());
+            std.debug.print("tr pos: {d}, mv: {d}\n", .{ d.elem_0.pos, d.elem_1.pos });
+        }
+
+        en_it = it.next();
+    }
+
+    // var tr_iter = try game.ecs_inst.getIterator(Transform);
+    // var mv_iter = try game.ecs_inst.getIterator(Movable);
+    // var i: u32 = 0;
+    // while (!mv_iter.isEnd() and !tr_iter.isEnd()) {
+    //     const tr = tr_iter.get();
+    //     const mv = mv_iter.get();
+    //     if (tr != null and mv != null) {
+    //         std.debug.print("Movable iteration {d}\n", .{i});
+    //         i += 1;
+
+    //         tr.?.pos += mv.?.pos;
+    //     }
+    //     tr_iter = tr_iter.next();
+    //     mv_iter = mv_iter.next();
+    // }
 
     //std.log.debug("transform {d}, movable {d}", .{ tr.component.type_index, mv.component.type_index });
 }
