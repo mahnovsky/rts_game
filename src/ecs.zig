@@ -142,8 +142,6 @@ const EntityImpl = struct {
     }
 };
 
-pub const Entity = *EntityImpl;
-
 const EcsError = error{
     EntityNotExist,
     ComponentAlreadyAdded,
@@ -335,30 +333,19 @@ fn makeContainer(comptime T: type) type {
             };
         }
 
-        fn getComponent(self: *Self, entity: Entity) EcsError!*T {
-            const index = try entity.getIndex();
-
-            if (self.storage.getItem(index)) |comp| {
+        fn getComponent(self: *Self, entity: EntityId) EcsError!*T {
+            if (self.storage.getItem(entity.index)) |comp| {
                 return comp;
             }
             return error.ComponetNotContains;
         }
 
-        fn addComponent(self: *Self, entity: Entity) anyerror!*T {
-            if (!entity.isAlive()) {
-                return error.EntityNotExist;
-            }
-
-            if (entity.hasComponent(T)) {
-                return error.ComponentAlreadyAdded;
-            }
-
-            const index = try entity.getIndex();
-            const opt_comp = self.storage.getItem(index) orelse self.storage.allocInplace(index);
+        fn addComponent(self: *Self, entity: EntityId) !*T {
+            const opt_comp = self.storage.getItem(entity.index) orelse self.storage.allocInplace(entity.index);
 
             if (opt_comp) |comp| {
                 comp.* = T.init();
-                entity.addComponent(getComponentFlag(T));
+                // entity.addComponent(getComponentFlag(T));
                 return comp;
             }
 
@@ -368,93 +355,109 @@ fn makeContainer(comptime T: type) type {
     };
 }
 
+pub const EntityId = struct {
+    index: u32,
+    version: u32,
+};
+
+pub const EntityInfo = struct {
+    components: u32,
+    version: u32,
+};
+
+const EntityCell = union(enum) {
+    Alive: EntityInfo,
+    Dead: void,
+};
+
 pub const Entities = struct {
     const Self = @This();
-    const BaseStorage = baseStorage(EntityImpl);
-
-    storage: BaseStorage,
-    free_entities: std.ArrayList(@Vector(2, u32)),
+    entities: std.ArrayList(EntityCell),
+    free_entities: std.ArrayList(EntityId),
     allocator: Allocator,
 
     pub const Iterator = struct {
         container: *Self,
-        iter: BaseStorage.Iterator,
+        index: usize,
 
         pub fn next(self: @This()) ?@This() {
-            var iter = self.iter.next();
-            while (iter) |next_iter| {
-                const ent = next_iter.get();
-                if (ent.isAlive()) {
-                    return .{
-                        .container = self.container,
-                        .iter = next_iter,
-                    };
-                }
-                iter = next_iter.next();
+            const len = self.container.entities.items.len;
+            if ((self.index + 1) < len) {
+                return .{
+                    .container = self.container,
+                    .index = self.index + 1,
+                };
             }
+
             return null;
         }
 
-        pub fn get(self: @This()) Entity {
-            return self.iter.get();
+        pub fn get(self: @This()) ?EntityId {
+            const cell = self.container.entities.items[self.index];
+
+            switch (cell) {
+                .Alive => |a| return .{ .index = @intCast(self.index), .version = a.version },
+                .Dead => return null,
+            }
         }
     };
 
-    fn init(gpa: Allocator) !Self {
+    fn init(gpa: Allocator) Self {
         return Self{
-            .storage = try BaseStorage.init(gpa),
+            .entities = .empty,
             .free_entities = .empty,
             .allocator = gpa,
         };
     }
 
     fn deinit(self: *Self) void {
-        self.storage.deinit();
+        self.entities.deinit(self.allocator);
         self.free_entities.deinit(self.allocator);
     }
 
-    fn makeEntity(self: *Self) !Entity {
+    fn makeEntity(self: *Self) !EntityId {
         if (self.free_entities.pop()) |info| {
-            if (self.getEntity(info[0])) |ent| {
-                ent.content = .{
-                    .index = info[0],
-                    .components = 0,
-                    .version = info[1] + 1,
-                };
-                return ent;
+            const newVersion = info.version + 1;
+            self.entities.items[info.index] = .{ .Alive = .{ .version = newVersion, .components = 0 } };
+
+            return .{ .index = info.index, .version = newVersion };
+        }
+
+        const index: u32 = @intCast(self.entities.items.len);
+        const cell = try self.entities.addOne(self.allocator);
+        cell.* = .{ .Alive = .{ .version = 0, .components = 0 } };
+        return .{ .index = index, .version = 0 };
+    }
+
+    fn killEntity(self: *Self, entity: EntityId) !void {
+        if (self.getEntity(entity.index)) |info| {
+            if (info.version != entity.version) {
+                return error.EntityNotExist;
+            }
+            self.entities.items[entity.index] = .Dead;
+        }
+        self.free_entities.append(self.allocator, .{ .index = entity.index, .version = entity.version }) catch {
+            unreachable;
+        };
+    }
+
+    fn getEntity(self: Self, index: u32) ?EntityId {
+        std.debug.print("getEntity index {}\n", .{index});
+        if (index < self.entities.items.len) {
+            std.debug.print("getEntity len {}\n", .{self.entities.items.len});
+            const info = self.entities.items[index];
+            switch (info) {
+                .Alive => |a| return .{ .index = index, .version = a.version },
+                .Dead => unreachable,
             }
         }
-
-        if (self.storage.addOne()) |res| {
-            res.ptr.* = .{ .content = .{
-                .index = res.pos,
-                .components = 0,
-                .version = 0,
-            } };
-            return res.ptr;
-        }
-        unreachable;
-    }
-
-    fn killEntity(self: *Self, entity: Entity) void {
-        if (entity.isAlive()) {
-            const index = entity.getIndex() catch unreachable;
-            const version = entity.getVersion() catch unreachable;
-            self.free_entities.append(self.allocator, .{ index, version }) catch {
-                unreachable;
-            };
-            entity.content = null;
-        }
-    }
-
-    fn getEntity(self: *Self, index: u32) ?Entity {
-        return self.storage.getItem(@intCast(index));
+        return null;
     }
 
     pub fn getIterator(self: *Self) Iterator {
         return .{
             .container = self,
-            .iter = self.storage.getIterator(),
+            .index = 0,
         };
     }
 };
@@ -470,7 +473,7 @@ pub const Ecs = struct {
         return .{
             .allocator = gpa,
             .components = .empty,
-            .entities = try Entities.init(gpa),
+            .entities = Entities.init(gpa),
         };
     }
 
@@ -483,21 +486,29 @@ pub const Ecs = struct {
         self.components.deinit(self.allocator);
     }
 
-    pub fn makeEntity(self: *Self) !Entity {
+    pub fn makeEntity(self: *Self) !EntityId {
         return self.entities.makeEntity();
     }
 
-    pub fn killEntity(self: *Self, entity: Entity) void {
-        self.entities.killEntity(entity);
+    pub fn killEntity(self: *Self, entity: EntityId) !void {
+        try self.entities.killEntity(entity);
     }
 
-    pub fn getEntity(self: *Self, index: u32) ?Entity {
+    pub fn getEntity(self: Self, index: u32) ?EntityId {
         return self.entities.getEntity(index);
     }
 
-    fn getContainer(self: *Self, comptime T: type) ?*makeContainer(T) {
-        //const Container = makeContainer(T);
+    pub fn isEntityExist(self: Self, entity_id: EntityId) bool {
+        std.debug.print("isEntityExist entity_id index {}, version {}\n", .{ entity_id.index, entity_id.version });
+        if (self.entities.getEntity(entity_id.index)) |ent| {
+            std.debug.print("isEntityExist ent index {}, version {}\n", .{ ent.index, ent.version });
+            return ent.version == entity_id.version;
+        }
 
+        return false;
+    }
+
+    fn getContainer(self: *Self, comptime T: type) ?*makeContainer(T) {
         const index = typeIndex(T);
         if (self.components.items.len <= index) {
             //const container = try Container.create(self.allocator);
@@ -518,29 +529,36 @@ pub const Ecs = struct {
         }
     }
 
-    pub fn addComponent(self: *Self, comptime T: type, entity: Entity) !*T {
-        try self.grow(T);
-        const container = self.getContainer(T);
+    pub fn addComponent(self: *Self, comptime T: type, entity: EntityId) !*T {
+        if (self.isEntityExist(entity)) {
+            try self.grow(T);
+            if (self.getContainer(T)) |container| {
+                return try container.addComponent(entity);
+            }
+        }
 
-        return container.?.addComponent(entity);
+        return error.EntityNotExist;
     }
 
-    pub fn removeComponent(self: *Self, comptime T: type, entity: Entity) EcsError!void {
-        const component_flag = getComponentFlag(T);
+    pub fn removeComponent(self: *Self, comptime T: type, entity: EntityId) EcsError!void {
+        if (self.isEntityExist(entity)) {
+            const component_flag = getComponentFlag(T);
 
-        var comps = try entity.getComponents();
-        std.debug.print("removeComponent comps: {d}, component_flag: {d}\n", .{ comps, component_flag });
-        comps ^= component_flag;
-        entity.setComponent(comps);
-        //container.removeComponent(entity);
+            var comps = try entity.getComponents();
+            std.debug.print("removeComponent comps: {d}, component_flag: {d}\n", .{ comps, component_flag });
+            comps ^= component_flag;
+            entity.setComponent(comps);
+            //container.removeComponent(entity);
 
-        const container = self.getContainer(T);
-        const comp = try container.?.getComponent(entity);
-        comp.*.deinit();
+            const container = self.getContainer(T);
+            const comp = try container.?.getComponent(entity);
+            comp.*.deinit();
+        }
+        return error.EntityNotExist;
     }
 
-    pub fn getComponent(self: *Self, comptime T: type, entity: Entity) EcsError!*T {
-        if (!entity.isAlive()) {
+    pub fn getComponent(self: *Self, comptime T: type, entity: EntityId) EcsError!*T {
+        if (!self.isEntityExist(entity)) {
             return error.EntityNotExist;
         }
         if (self.getContainer(T)) |container| {
@@ -549,10 +567,11 @@ pub const Ecs = struct {
         return error.ComponetNotContains;
     }
 
-    pub fn getComponents(self: *Self, comptime Args: []const type, entity: Entity) EcsError!generateStruct(Args) {
-        if (!entity.isAlive()) {
+    pub fn getComponents(self: *Self, comptime Args: []const type, entity: EntityId) EcsError!generateStruct(Args) {
+        if (!self.isEntityExist(entity)) {
             return error.EntityNotExist;
         }
+
         const S = generateStruct(Args);
         const fields = std.meta.fields(S);
         var res: S = undefined;

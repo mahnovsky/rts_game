@@ -81,7 +81,7 @@ pub const TextureViewWindow = struct {
             @intCast(atl.texture_height),
             "Texture View",
             null,
-            @ptrCast(orig),
+            @ptrCast(@alignCast(orig)),
         );
 
         glfw.glfwMakeContextCurrent(window);

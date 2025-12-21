@@ -148,12 +148,12 @@ pub fn postInit(game: *Game) !void {
     }
 
     if (game.ecs_inst.getEntity(12)) |ent_12| {
-        std.debug.print("added sprite to ent {d}\n", .{try ent_12.getIndex()});
+        std.debug.print("added sprite to ent {d}\n", .{ent_12.index});
         _ = try game.ecs_inst.addComponent(Sprite, ent_12);
         var tr = try game.ecs_inst.getComponent(Transform, ent_12);
         tr.pos = 8;
         //_ = try game.ecs_inst.removeComponent(Movable, ent_12);
-        game.ecs_inst.killEntity(ent_12);
+        try game.ecs_inst.killEntity(ent_12);
     }
 
     const ent = try game.ecs_inst.makeEntity();
@@ -167,18 +167,10 @@ pub fn postInit(game: *Game) !void {
     var en_it: ?ecs.Entities.Iterator = game.ecs_inst.entities.getIterator();
     //const Res = ecs.generateStruct(&.{ Transform, Movable, Sprite });
     while (en_it) |it| {
-        const index = try it.get().getIndex();
-        const comps = try it.get().getComponents();
-        std.debug.print("Entity iteration id: {d}, comps: {d}\n", .{ index, comps });
-
-        if ((comps & flags) == flags) {
-            //const tr = try game.ecs_inst.getComponent(Transform, it.get());
-            //const mv = try game.ecs_inst.getComponent(Movable, it.get());
-            //const d = try game.ecs_inst.getComponents(try ecs.generateStruct(&.{ Transform, Movable }), it.get());
-            const d = try game.ecs_inst.getComponents(&.{ Transform, Movable }, it.get());
+        if (it.get()) |ent_id| {
+            const d = try game.ecs_inst.getComponents(&.{ Transform, Movable }, ent_id);
             std.debug.print("tr pos: {d}, mv: {d}\n", .{ d.elem_0.pos, d.elem_1.pos });
         }
-
         en_it = it.next();
     }
 
