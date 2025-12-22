@@ -127,48 +127,59 @@ pub fn postInit(game: *Game) !void {
 
     const Sprite = struct {
         const Self = @This();
-        component: ecs.Component,
+        //component: ecs.Component,
         pos: f32,
 
         pub fn init() Self {
             return .{
-                .component = ecs.Component.init(Self),
+                //.component = ecs.Component.init(Self),
                 .pos = 0,
             };
         }
+
+        pub fn deinit(_: *Self) void {}
     };
     std.debug.print("spawn started\n", .{});
     for (0..20) |_| {
-        const ent = try game.ecs_inst.makeEntity();
+        // const ent = try game.ecs_inst.makeEntity();
 
-        var tr = try game.ecs_inst.addComponent(Transform, ent);
-        tr.pos = 12;
-        var mv = try game.ecs_inst.addComponent(Movable, ent);
-        mv.pos = 44;
+        // var tr = try game.ecs_inst.addComponent(Transform, ent);
+        // tr.pos = 12;
+        // var mv = try game.ecs_inst.addComponent(Movable, ent);
+        // mv.pos = 44;
+
+        const object = try game.ecs_inst.spawnOne(&.{ Transform, Movable, Sprite });
+
+        object.components.Transform.pos = 11;
+        object.components.Movable.pos = 9;
+        object.components.Sprite.pos = 3;
     }
 
     if (game.ecs_inst.getEntity(12)) |ent_12| {
         std.debug.print("added sprite to ent {d}\n", .{ent_12.index});
-        _ = try game.ecs_inst.addComponent(Sprite, ent_12);
+        //_ = try game.ecs_inst.addComponent(Sprite, ent_12);
         var tr = try game.ecs_inst.getComponent(Transform, ent_12);
         tr.pos = 8;
-        //try game.ecs_inst.removeComponent(Movable, ent_12);
+        //try game.ecs_inst.removeComponent(Sprite, ent_12);
         //try game.ecs_inst.killEntity(ent_12);
     }
 
-    const ent = try game.ecs_inst.makeEntity();
-    _ = try game.ecs_inst.addComponent(Transform, ent);
-    _ = try game.ecs_inst.addComponent(Movable, ent);
-    _ = try game.ecs_inst.addComponent(Sprite, ent);
+    // const ent = try game.ecs_inst.makeEntity();
+    // _ = try game.ecs_inst.addComponent(Transform, ent);
+    // _ = try game.ecs_inst.addComponent(Movable, ent);
+    // _ = try game.ecs_inst.addComponent(Sprite, ent);
+
+    _ = try game.ecs_inst.spawnOne(&.{ Movable, Sprite });
+
     const flags = ecs.getComponentFlags(&.{ Transform, Movable });
     std.debug.print("Flags comps: {d}\n", .{flags});
     //const components = ecs.getComponentFlag(Transform) | ecs.getComponentFlag(Movable);
-    var en_it: ?ecs.Entities.Iterator = game.ecs_inst.entities.getIterator(&.{ Transform, Movable, Sprite });
+    var en_it: ?ecs.Entities.Iterator = game.ecs_inst.entities.getIterator(&.{ Transform, Movable });
     //const Res = ecs.generateStruct(&.{ Transform, Movable, Sprite });
     while (en_it) |it| {
         if (it.get()) |ent_id| {
-            const d = try game.ecs_inst.getComponents(&.{ Transform, Movable }, ent_id);
-            std.debug.print("ent {d} tr pos: {d}, mv: {d}\n", .{ en_it.?.index, d.Transform.pos, d.Movable.pos });
+            const d = try game.ecs_inst.getComponents(&.{ Transform, Movable, Sprite }, ent_id);
+            std.debug.print("ent {d} tr: {d}, mv: {d}, sp: {d}\n", .{ en_it.?.index, d.Transform.pos, d.Movable.pos, d.Sprite.pos });
         }
         en_it = it.next();
     }

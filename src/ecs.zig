@@ -98,58 +98,6 @@ pub fn generateStruct(comptime types: []const type) type {
     });
 }
 
-const EntityImpl = struct {
-    content: ?struct {
-        index: u32,
-        components: u32,
-        version: u32,
-    },
-
-    pub fn getIndex(self: @This()) EcsError!u32 {
-        if (self.content) |c| {
-            return @intCast(c.index);
-        }
-        return error.EntityNotExist;
-    }
-
-    pub fn getVersion(self: @This()) EcsError!u32 {
-        if (self.content) |c| {
-            return @intCast(c.version);
-        }
-        return error.EntityNotExist;
-    }
-
-    pub fn getComponents(self: @This()) EcsError!u32 {
-        if (self.content) |c| {
-            return c.components;
-        }
-        return error.EntityNotExist;
-    }
-
-    pub fn isAlive(self: @This()) bool {
-        return self.content != null;
-    }
-
-    pub fn hasComponent(self: @This(), comptime T: type) bool {
-        return (self.content.?.components & getComponentFlag(T)) != 0;
-    }
-
-    pub fn hasComponents(self: @This(), comptime types: []const type) bool {
-        const flags = getComponentFlags(types);
-        return (self.content.?.components & flags) == flags;
-    }
-
-    fn setComponent(self: *@This(), components: u32) void {
-        std.debug.print("set components {d}\n", .{components});
-        self.content.?.components = components;
-    }
-
-    fn addComponent(self: *@This(), component: u32) void {
-        //std.debug.print("add components {d}\n", .{component});
-        self.content.?.components |= component;
-    }
-};
-
 const EcsError = error{
     EntityNotExist,
     ComponentAlreadyAdded,
@@ -407,6 +355,8 @@ pub const Entities = struct {
 
             switch (cell) {
                 .Alive => |a| {
+                    const bit_test = (self.components & a.components);
+                    std.debug.print("Iterator.get bt: {d}, comps: {d}, accure: {d}\n", .{ bit_test, a.components, self.components });
                     if ((self.components & a.components) == self.components) {
                         //std.debug.print("Iterator.get {d}, c: {d}\n", .{ self.index, a.components });
                         return .{ .index = @intCast(self.index), .version = a.version };
@@ -527,6 +477,21 @@ pub const Entities = struct {
 
         return false;
     }
+
+    pub fn hasComponent(self: Self, comptime T: type, entity: EntityId) bool {
+        if (self.isEntityExist(entity)) {
+            const info = self.entities.items[entity.index];
+            const flag = getComponentFlag(T);
+            switch (info) {
+                .Alive => |a| {
+                    return (a.components & flag) > 0;
+                },
+                .Dead => unreachable,
+            }
+        }
+
+        return false;
+    }
 };
 
 pub const Ecs = struct {
@@ -557,6 +522,21 @@ pub const Ecs = struct {
         return self.entities.makeEntity();
     }
 
+    pub fn spawnOne(self: *Self, comptime types: []const type) !struct { entity: EntityId, components: generateStruct(types) } {
+        const entity = try self.makeEntity();
+        const S = generateStruct(types);
+        var res: S = undefined;
+        inline for (types) |T| {
+            @field(&res, prettyTypeName(T)) = try self.addComponent(T, entity);
+        }
+
+        return .{ .entity = entity, .components = res };
+    }
+
+    // pub fn spawn(self: *Self, count: u32) []EntityId {
+    //     for (0..count) |_| {}
+    // }
+
     pub fn killEntity(self: *Self, entity: EntityId) !void {
         try self.entities.killEntity(entity);
     }
@@ -567,6 +547,10 @@ pub const Ecs = struct {
 
     pub fn isEntityExist(self: Self, entity: EntityId) bool {
         return self.entities.isEntityExist(entity);
+    }
+
+    pub fn hasComponent(self: Self, comptime T: type, entity: EntityId) bool {
+        return self.entities.hasComponent(T, entity);
     }
 
     pub fn getComponentsFlag(self: Self, entity: EntityId) !u32 {
@@ -623,6 +607,11 @@ pub const Ecs = struct {
         if (!self.isEntityExist(entity)) {
             return error.EntityNotExist;
         }
+
+        if (!self.hasComponent(T, entity)) {
+            return error.ComponetNotContains;
+        }
+
         if (self.getContainer(T)) |container| {
             return try container.getComponent(entity);
         }
@@ -642,10 +631,8 @@ pub const Ecs = struct {
                 .pointer => |info| info.child,
                 else => @compileError("Expected a pointer type"),
             };
-            if (self.getContainer(child_type)) |container| {
-                //std.fmt.comptimePrint("elem_{d}", .{i})
-                @field(&res, prettyTypeName(child_type)) = try container.getComponent(entity);
-            }
+
+            @field(&res, prettyTypeName(child_type)) = try self.getComponent(child_type, entity);
         }
         return res;
     }
