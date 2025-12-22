@@ -152,7 +152,7 @@ pub fn postInit(game: *Game) !void {
         _ = try game.ecs_inst.addComponent(Sprite, ent_12);
         var tr = try game.ecs_inst.getComponent(Transform, ent_12);
         tr.pos = 8;
-        try game.ecs_inst.removeComponent(Movable, ent_12);
+        //try game.ecs_inst.removeComponent(Movable, ent_12);
         //try game.ecs_inst.killEntity(ent_12);
     }
 
@@ -163,7 +163,7 @@ pub fn postInit(game: *Game) !void {
     const flags = ecs.getComponentFlags(&.{ Transform, Movable });
     std.debug.print("Flags comps: {d}\n", .{flags});
     //const components = ecs.getComponentFlag(Transform) | ecs.getComponentFlag(Movable);
-    var en_it: ?ecs.Entities.Iterator = game.ecs_inst.entities.getIterator();
+    var en_it: ?ecs.Entities.Iterator = game.ecs_inst.entities.getIterator(&.{ Transform, Movable, Sprite });
     //const Res = ecs.generateStruct(&.{ Transform, Movable, Sprite });
     while (en_it) |it| {
         if (it.get()) |ent_id| {

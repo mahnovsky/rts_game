@@ -386,13 +386,16 @@ pub const Entities = struct {
     pub const Iterator = struct {
         container: *Self,
         index: usize,
+        components: u32,
 
         pub fn next(self: @This()) ?@This() {
             const len = self.container.entities.items.len;
+            //std.debug.print("Iterator.next {d}\n", .{len});
             if ((self.index + 1) < len) {
                 return .{
                     .container = self.container,
                     .index = self.index + 1,
+                    .components = self.components,
                 };
             }
 
@@ -403,7 +406,12 @@ pub const Entities = struct {
             const cell = self.container.entities.items[self.index];
 
             switch (cell) {
-                .Alive => |a| return .{ .index = @intCast(self.index), .version = a.version },
+                .Alive => |a| {
+                    if ((self.components & a.components) == self.components) {
+                        //std.debug.print("Iterator.get {d}, c: {d}\n", .{ self.index, a.components });
+                        return .{ .index = @intCast(self.index), .version = a.version };
+                    }
+                },
                 .Dead => std.debug.print("Iterator.get empty element\n", .{}),
             }
 
@@ -463,10 +471,11 @@ pub const Entities = struct {
         return null;
     }
 
-    pub fn getIterator(self: *Self) Iterator {
+    pub fn getIterator(self: *Self, types: []const type) Iterator {
         return .{
             .container = self,
             .index = 0,
+            .components = getComponentFlags(types),
         };
     }
 
@@ -511,8 +520,8 @@ pub const Entities = struct {
 
     pub fn isEntityExist(self: Self, entity: EntityId) bool {
         if (self.getEntity(entity.index)) |ent| {
-            std.debug.print("isEntityExist index: {d}, version: {d} == ", .{ entity.index, entity.version });
-            std.debug.print("isEntityExist index: {d}, version: {d}\n", .{ ent.index, ent.version });
+            //std.debug.print("isEntityExist index: {d}, version: {d} == ", .{ entity.index, entity.version });
+            //std.debug.print("isEntityExist index: {d}, version: {d}\n", .{ ent.index, ent.version });
             return ent.version == entity.version;
         }
 
