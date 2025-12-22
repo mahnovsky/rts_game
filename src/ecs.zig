@@ -64,13 +64,21 @@ pub fn getComponentFlags(comptime fields: []const type) u32 {
     return res;
 }
 
+pub fn prettyTypeName(comptime ctype: type) [:0]const u8 {
+    const name = @typeName(ctype); //std.fmt.comptimePrint("elem_{d}", .{i});
+    if (std.mem.lastIndexOf(u8, name, ".")) |index| {
+        return name[index + 1 .. :0];
+    }
+}
+
 pub fn generateStruct(comptime types: []const type) type {
     var fields: [types.len]std.builtin.Type.StructField = undefined;
 
     inline for (0.., types) |i, ctype| {
         //var iter = std.mem.splitBackwardsScalar(u8, @typeName(ctype), '.');
 
-        const name = std.fmt.comptimePrint("elem_{d}", .{i});
+        const name = prettyTypeName(ctype); //std.fmt.comptimePrint("elem_{d}", .{i});
+
         fields[i] = .{
             .name = name,
             .type = *ctype,
@@ -350,7 +358,6 @@ fn makeContainer(comptime T: type) type {
             }
 
             unreachable;
-            //return error.ComponetNotContains;
         }
     };
 }
@@ -397,8 +404,10 @@ pub const Entities = struct {
 
             switch (cell) {
                 .Alive => |a| return .{ .index = @intCast(self.index), .version = a.version },
-                .Dead => return null,
+                .Dead => std.debug.print("Iterator.get empty element\n", .{}),
             }
+
+            return null;
         }
     };
 
@@ -430,9 +439,11 @@ pub const Entities = struct {
     }
 
     fn killEntity(self: *Self, entity: EntityId) !void {
-        if (self.getEntity(entity.index)) |info| {
-            if (info.version != entity.version) {
-                return error.EntityNotExist;
+        if (entity.index < self.entities.items.len) {
+            const info = self.entities.items[entity.index];
+            switch (info) {
+                .Alive => |_| std.debug.print("killEntity {d}\n", .{entity.index}),
+                .Dead => return error.EntityNotExist,
             }
             self.entities.items[entity.index] = .Dead;
         }
@@ -442,13 +453,11 @@ pub const Entities = struct {
     }
 
     fn getEntity(self: Self, index: u32) ?EntityId {
-        std.debug.print("getEntity index {}\n", .{index});
         if (index < self.entities.items.len) {
-            std.debug.print("getEntity len {}\n", .{self.entities.items.len});
             const info = self.entities.items[index];
             switch (info) {
                 .Alive => |a| return .{ .index = index, .version = a.version },
-                .Dead => unreachable,
+                .Dead => return null,
             }
         }
         return null;
@@ -459,6 +468,55 @@ pub const Entities = struct {
             .container = self,
             .index = 0,
         };
+    }
+
+    pub fn getComponentsFlag(self: Self, entity: EntityId) !u32 {
+        if (self.isEntityExist(entity)) {
+            const info = self.entities.items[entity.index];
+            switch (info) {
+                .Alive => |a| return a.components,
+                .Dead => unreachable,
+            }
+        }
+        return error.EntityNotExist;
+    }
+
+    pub fn setComponentsFlag(self: *Self, entity: EntityId, flag: u32) !void {
+        if (self.isEntityExist(entity)) {
+            const info = self.entities.items[entity.index];
+            switch (info) {
+                .Alive => |a| {
+                    self.entities.items[entity.index] = .{ .Alive = .{ .version = a.version, .components = flag } };
+                },
+                .Dead => unreachable,
+            }
+        } else {
+            return error.EntityNotExist;
+        }
+    }
+
+    pub fn addComponentsFlag(self: *Self, entity: EntityId, flag: u32) !void {
+        if (self.isEntityExist(entity)) {
+            const info = self.entities.items[entity.index];
+            switch (info) {
+                .Alive => |a| {
+                    self.entities.items[entity.index] = .{ .Alive = .{ .version = a.version, .components = a.components | flag } };
+                },
+                .Dead => unreachable,
+            }
+        } else {
+            return error.EntityNotExist;
+        }
+    }
+
+    pub fn isEntityExist(self: Self, entity: EntityId) bool {
+        if (self.getEntity(entity.index)) |ent| {
+            std.debug.print("isEntityExist index: {d}, version: {d} == ", .{ entity.index, entity.version });
+            std.debug.print("isEntityExist index: {d}, version: {d}\n", .{ ent.index, ent.version });
+            return ent.version == entity.version;
+        }
+
+        return false;
     }
 };
 
@@ -498,23 +556,17 @@ pub const Ecs = struct {
         return self.entities.getEntity(index);
     }
 
-    pub fn isEntityExist(self: Self, entity_id: EntityId) bool {
-        std.debug.print("isEntityExist entity_id index {}, version {}\n", .{ entity_id.index, entity_id.version });
-        if (self.entities.getEntity(entity_id.index)) |ent| {
-            std.debug.print("isEntityExist ent index {}, version {}\n", .{ ent.index, ent.version });
-            return ent.version == entity_id.version;
-        }
+    pub fn isEntityExist(self: Self, entity: EntityId) bool {
+        return self.entities.isEntityExist(entity);
+    }
 
-        return false;
+    pub fn getComponentsFlag(self: Self, entity: EntityId) !u32 {
+        return self.entities.getComponentsFlag(entity);
     }
 
     fn getContainer(self: *Self, comptime T: type) ?*makeContainer(T) {
         const index = typeIndex(T);
-        if (self.components.items.len <= index) {
-            //const container = try Container.create(self.allocator);
-            //try self.components.append(container.getComponentContainer());
-            return null;
-        }
+        std.debug.assert(self.components.items.len > index);
 
         return @ptrCast(@alignCast(self.components.items[index].ptr));
     }
@@ -533,6 +585,7 @@ pub const Ecs = struct {
         if (self.isEntityExist(entity)) {
             try self.grow(T);
             if (self.getContainer(T)) |container| {
+                try self.entities.addComponentsFlag(entity, getComponentFlag(T));
                 return try container.addComponent(entity);
             }
         }
@@ -544,17 +597,17 @@ pub const Ecs = struct {
         if (self.isEntityExist(entity)) {
             const component_flag = getComponentFlag(T);
 
-            var comps = try entity.getComponents();
+            var comps = try self.getComponentsFlag(entity);
             std.debug.print("removeComponent comps: {d}, component_flag: {d}\n", .{ comps, component_flag });
             comps ^= component_flag;
-            entity.setComponent(comps);
-            //container.removeComponent(entity);
+            try self.entities.setComponentsFlag(entity, comps);
 
             const container = self.getContainer(T);
             const comp = try container.?.getComponent(entity);
             comp.*.deinit();
+        } else {
+            return error.EntityNotExist;
         }
-        return error.EntityNotExist;
     }
 
     pub fn getComponent(self: *Self, comptime T: type, entity: EntityId) EcsError!*T {
@@ -575,13 +628,14 @@ pub const Ecs = struct {
         const S = generateStruct(Args);
         const fields = std.meta.fields(S);
         var res: S = undefined;
-        inline for (fields, 0..) |field, i| {
+        inline for (fields) |field| {
             const child_type = switch (@typeInfo(field.type)) {
                 .pointer => |info| info.child,
                 else => @compileError("Expected a pointer type"),
             };
             if (self.getContainer(child_type)) |container| {
-                @field(&res, std.fmt.comptimePrint("elem_{d}", .{i})) = try container.getComponent(entity);
+                //std.fmt.comptimePrint("elem_{d}", .{i})
+                @field(&res, prettyTypeName(child_type)) = try container.getComponent(entity);
             }
         }
         return res;

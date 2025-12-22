@@ -137,7 +137,7 @@ pub fn postInit(game: *Game) !void {
             };
         }
     };
-
+    std.debug.print("spawn started\n", .{});
     for (0..20) |_| {
         const ent = try game.ecs_inst.makeEntity();
 
@@ -152,15 +152,14 @@ pub fn postInit(game: *Game) !void {
         _ = try game.ecs_inst.addComponent(Sprite, ent_12);
         var tr = try game.ecs_inst.getComponent(Transform, ent_12);
         tr.pos = 8;
-        //_ = try game.ecs_inst.removeComponent(Movable, ent_12);
-        try game.ecs_inst.killEntity(ent_12);
+        try game.ecs_inst.removeComponent(Movable, ent_12);
+        //try game.ecs_inst.killEntity(ent_12);
     }
 
     const ent = try game.ecs_inst.makeEntity();
     _ = try game.ecs_inst.addComponent(Transform, ent);
     _ = try game.ecs_inst.addComponent(Movable, ent);
     _ = try game.ecs_inst.addComponent(Sprite, ent);
-    //const Tuple = std.meta.Tuple;
     const flags = ecs.getComponentFlags(&.{ Transform, Movable });
     std.debug.print("Flags comps: {d}\n", .{flags});
     //const components = ecs.getComponentFlag(Transform) | ecs.getComponentFlag(Movable);
@@ -169,7 +168,7 @@ pub fn postInit(game: *Game) !void {
     while (en_it) |it| {
         if (it.get()) |ent_id| {
             const d = try game.ecs_inst.getComponents(&.{ Transform, Movable }, ent_id);
-            std.debug.print("tr pos: {d}, mv: {d}\n", .{ d.elem_0.pos, d.elem_1.pos });
+            std.debug.print("ent {d} tr pos: {d}, mv: {d}\n", .{ en_it.?.index, d.Transform.pos, d.Movable.pos });
         }
         en_it = it.next();
     }
