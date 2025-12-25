@@ -19,7 +19,7 @@ pub fn main() anyerror!u8 {
     var game = try Game.init(allocator, &app);
     defer game.deinit(allocator);
 
-    try game.postInit();
+    try game.postInit(allocator);
 
     try app.run(&game);
 

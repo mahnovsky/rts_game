@@ -29,6 +29,9 @@ fn initRandom() !void {
         break :blk seed;
     });
 }
+
+const World = struct {};
+const Ecs = ecs.CreateEcs(World);
 var game_instance: ?*Game = null;
 app: *App,
 map: GameMap,
@@ -37,7 +40,7 @@ proj: zm.Mat4f,
 camera: zm.Mat4f,
 camera_offset: zm.Vec2f,
 move_camera: bool,
-ecs_inst: ecs.Ecs,
+ecs_inst: Ecs,
 
 pub fn init(gpa: std.mem.Allocator, app: *App) !Game {
     const proj = zm.Mat4f.orthographic(
@@ -82,7 +85,7 @@ pub fn init(gpa: std.mem.Allocator, app: *App) !Game {
         .camera = zm.Mat4f.identity(),
         .camera_offset = .{ 0, 0 },
         .move_camera = true,
-        .ecs_inst = try ecs.Ecs.init(gpa),
+        .ecs_inst = try Ecs.init(gpa),
     };
 }
 
@@ -91,7 +94,7 @@ pub fn deinit(game: *Game, gpa: std.mem.Allocator) void {
     game.ecs_inst.deinit();
 }
 
-pub fn postInit(game: *Game) !void {
+pub fn postInit(game: *Game, allocator: std.mem.Allocator) !void {
     const Movable = struct {
         const Self = @This();
         component: ecs.Component,
@@ -100,11 +103,18 @@ pub fn postInit(game: *Game) !void {
         pub fn init() Self {
             return .{
                 .component = ecs.Component.init(Self),
-                .pos = 0,
+                .pos = 0.3,
             };
         }
         pub fn deinit(self: *Self) void {
             self.pos = 0.0;
+        }
+
+        pub fn create(gpa: std.mem.Allocator) *anyopaque {
+            const res = gpa.create(Self) catch unreachable;
+            res.* = Self.init();
+            std.log.info("Movable created {d}", .{res.pos});
+            return res;
         }
     };
 
@@ -123,22 +133,66 @@ pub fn postInit(game: *Game) !void {
         pub fn deinit(self: *Self) void {
             self.pos = 0.0;
         }
+
+        pub fn create(gpa: std.mem.Allocator) *anyopaque {
+            const res = gpa.create(Self) catch unreachable;
+            res.* = Self.init();
+
+            return res;
+        }
     };
 
     const Sprite = struct {
         const Self = @This();
-        //component: ecs.Component,
+        component: ecs.Component,
         pos: f32,
 
         pub fn init() Self {
             return .{
-                //.component = ecs.Component.init(Self),
+                .component = ecs.Component.init(Self),
                 .pos = 0,
             };
         }
 
+        pub fn create(gpa: std.mem.Allocator) *anyopaque {
+            const res = gpa.create(Self) catch unreachable;
+            res.* = Self.init();
+
+            return res;
+        }
+
         pub fn deinit(_: *Self) void {}
     };
+    const Indexing = @import("type_indexing.zig");
+
+    // const ComponentIndexing = Indexing.CreateTypeIndexing(ecs.Component);
+
+    // const sp_index = ComponentIndexing.initTypeIndex(Sprite, allocator);
+    // const tr_index = ComponentIndexing.initTypeIndex(Transform, allocator);
+    // const mv_index = ComponentIndexing.initTypeIndex(Movable, allocator);
+
+    // std.log.info("sp: {d}, tr: {d}, mv: {d}", .{ sp_index, tr_index, mv_index });
+
+    const Resource = struct {
+        const Self = @This();
+        pub fn innerTypeId(comptime T: type) *Indexing.TypeIdData(T, Self) {
+            return &struct {
+                comptime {
+                    _ = Indexing.TypeIdData(T, Self);
+                }
+                var id: Indexing.TypeIdData(T, Self) = .{};
+            }.id;
+        }
+    };
+    const ResourceIndexing = Indexing.CreateTypeIndexing(Resource);
+    const rmv_index = ResourceIndexing.initTypeIndex(Movable, allocator);
+    _ = ResourceIndexing.initTypeIndex(Sprite, allocator);
+    _ = ResourceIndexing.initTypeIndex(Transform, allocator);
+
+    const tn = try ResourceIndexing.getTypeName(1);
+
+    std.log.info("sp: {d}, tr: {d}, mv: {d}, tn {s}", .{ try ResourceIndexing.getIndexByName("Sprite"), try ResourceIndexing.getIndexByName("Transform"), rmv_index, tn });
+
     std.debug.print("spawn started\n", .{});
     for (0..20) |_| {
         // const ent = try game.ecs_inst.makeEntity();
@@ -171,10 +225,10 @@ pub fn postInit(game: *Game) !void {
 
     _ = try game.ecs_inst.spawnOne(&.{ Movable, Sprite });
 
-    const flags = ecs.getComponentFlags(&.{ Transform, Movable });
+    const flags = Ecs.ComponentIndexing.getTypeFlags(&.{ Transform, Movable });
     std.debug.print("Flags comps: {d}\n", .{flags});
     //const components = ecs.getComponentFlag(Transform) | ecs.getComponentFlag(Movable);
-    var en_it: ?ecs.Entities.Iterator = game.ecs_inst.entities.getIterator(&.{ Transform, Movable });
+    var en_it: ?Ecs.Entities.Iterator = game.ecs_inst.entities.getIterator(&.{ Transform, Movable });
     //const Res = ecs.generateStruct(&.{ Transform, Movable, Sprite });
     while (en_it) |it| {
         if (it.get()) |ent_id| {
