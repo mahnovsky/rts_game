@@ -185,6 +185,7 @@ fn baseStorage(comptime T: type) type {
 const ComponentContainer = struct {
     ptr: *anyopaque,
     destroy_func: *const fn (*anyopaque) void,
+    create_func: *const fn (*anyopaque, EntityId) ?*anyopaque,
 };
 
 fn makeContainer(comptime T: type) type {
@@ -221,10 +222,19 @@ fn makeContainer(comptime T: type) type {
             self.destroy();
         }
 
+        fn createComponent(ptr: *anyopaque, id: EntityId) ?*anyopaque {
+            const self: *Self = @ptrCast(@alignCast(ptr));
+
+            const component = self.addComponent(id) catch return null;
+
+            return component;
+        }
+
         fn getComponentContainer(self: *Self) ComponentContainer {
             return .{
                 .ptr = self,
                 .destroy_func = &destroySelf,
+                .create_func = &createComponent,
             };
         }
 
@@ -440,6 +450,7 @@ pub fn CreateEcs(comptime Space: type) type {
     return struct {
         const Self = @This();
         pub const ComponentIndexing = Indexing.CreateTypeIndexing(Space);
+        pub const ResourceIndexing = Indexing.CreateTypeIndexing(Self);
         pub const Entities = CreateEntities(Space);
         allocator: Allocator,
         components: std.ArrayList(ComponentContainer),
@@ -460,6 +471,25 @@ pub fn CreateEcs(comptime Space: type) type {
             }
 
             self.components.deinit(self.allocator);
+            ComponentIndexing.deinit(self.allocator);
+        }
+
+        pub fn addComponentByName(self: *Self, id: EntityId, name: [:0]const u8) !*anyopaque {
+            if (!self.isEntityExist(id)) {
+                return error.EntityNotExist;
+            }
+
+            const info = try ComponentIndexing.getInfoByName(name);
+            if (info.index < self.components.items.len) {
+                const comp = &self.components.items[info.index];
+                if (comp.create_func(comp.ptr, id)) |res| {
+                    try self.entities.addComponentsFlag(id, info.flag);
+                    return res;
+                } else {
+                    return error.ComponetNotContains;
+                }
+            }
+            return error.EntityNotExist;
         }
 
         pub fn makeEntity(self: *Self) !EntityId {
@@ -476,10 +506,6 @@ pub fn CreateEcs(comptime Space: type) type {
 
             return .{ .entity = entity, .components = res };
         }
-
-        // pub fn spawn(self: *Self, count: u32) []EntityId {
-        //     for (0..count) |_| {}
-        // }
 
         pub fn killEntity(self: *Self, entity: EntityId) !void {
             try self.entities.killEntity(entity);

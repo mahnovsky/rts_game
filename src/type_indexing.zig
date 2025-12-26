@@ -14,8 +14,13 @@ pub fn TypeIdData(comptime T: type, comptime Space: type) type {
 pub fn CreateTypeIndexing(comptime Space: type) type {
     return struct {
         const Self = @This();
+        const Info = struct {
+            index: u32,
+            flag: u32,
+            name: [:0]const u8,
+        };
         var counter: u32 = 0;
-        var type_names: std.ArrayList([:0]const u8) = .empty;
+        var type_info: std.ArrayList(Info) = .empty;
 
         fn innerTypeId(comptime T: type) *TypeIdData(T, Space) {
             return &struct {
@@ -30,6 +35,10 @@ pub fn CreateTypeIndexing(comptime Space: type) type {
             return innerTypeId(T).index;
         }
 
+        pub fn deinit(gpa: Allocator) void {
+            type_info.deinit(gpa);
+        }
+
         pub fn initTypeIndex(comptime T: type, gpa: Allocator) u32 {
             const index_ptr = &innerTypeId(T).index;
             if (index_ptr.* < std.math.maxInt(u32)) {
@@ -42,7 +51,11 @@ pub fn CreateTypeIndexing(comptime Space: type) type {
             const flag_ptr = &innerTypeId(T).flag;
             flag_ptr.* = std.math.pow(u32, 2, index);
 
-            type_names.insert(gpa, index, innerTypeId(T).type_name) catch unreachable;
+            type_info.insert(gpa, index, .{
+                .index = index,
+                .flag = innerTypeId(T).flag,
+                .name = innerTypeId(T).type_name,
+            }) catch unreachable;
 
             return index;
         }
@@ -66,16 +79,25 @@ pub fn CreateTypeIndexing(comptime Space: type) type {
         }
 
         pub fn getTypeName(index: u32) ![:0]const u8 {
-            if (index >= type_names.items.len) {
+            if (index >= type_info.items.len) {
                 return error.NoTypeNameForIndex;
             }
-            return type_names.items[index];
+            return type_info.items[index].name;
         }
 
         pub fn getIndexByName(type_name: [:0]const u8) !u32 {
-            for (type_names.items, 0..) |name, index| {
-                if (std.mem.eql(u8, type_name, name)) {
-                    return @intCast(index);
+            for (type_info.items) |info| {
+                if (std.mem.eql(u8, type_name, info.name)) {
+                    return info.index;
+                }
+            }
+            return error.NoTypeNameForIndex;
+        }
+
+        pub fn getInfoByName(type_name: [:0]const u8) !Info {
+            for (type_info.items) |info| {
+                if (std.mem.eql(u8, type_name, info.name)) {
+                    return info;
                 }
             }
             return error.NoTypeNameForIndex;

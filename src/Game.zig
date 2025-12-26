@@ -94,7 +94,7 @@ pub fn deinit(game: *Game, gpa: std.mem.Allocator) void {
     game.ecs_inst.deinit();
 }
 
-pub fn postInit(game: *Game, allocator: std.mem.Allocator) !void {
+pub fn postInit(game: *Game, _: std.mem.Allocator) !void {
     const Movable = struct {
         const Self = @This();
         component: ecs.Component,
@@ -163,35 +163,6 @@ pub fn postInit(game: *Game, allocator: std.mem.Allocator) !void {
 
         pub fn deinit(_: *Self) void {}
     };
-    const Indexing = @import("type_indexing.zig");
-
-    // const ComponentIndexing = Indexing.CreateTypeIndexing(ecs.Component);
-
-    // const sp_index = ComponentIndexing.initTypeIndex(Sprite, allocator);
-    // const tr_index = ComponentIndexing.initTypeIndex(Transform, allocator);
-    // const mv_index = ComponentIndexing.initTypeIndex(Movable, allocator);
-
-    // std.log.info("sp: {d}, tr: {d}, mv: {d}", .{ sp_index, tr_index, mv_index });
-
-    const Resource = struct {
-        const Self = @This();
-        pub fn innerTypeId(comptime T: type) *Indexing.TypeIdData(T, Self) {
-            return &struct {
-                comptime {
-                    _ = Indexing.TypeIdData(T, Self);
-                }
-                var id: Indexing.TypeIdData(T, Self) = .{};
-            }.id;
-        }
-    };
-    const ResourceIndexing = Indexing.CreateTypeIndexing(Resource);
-    const rmv_index = ResourceIndexing.initTypeIndex(Movable, allocator);
-    _ = ResourceIndexing.initTypeIndex(Sprite, allocator);
-    _ = ResourceIndexing.initTypeIndex(Transform, allocator);
-
-    const tn = try ResourceIndexing.getTypeName(1);
-
-    std.log.info("sp: {d}, tr: {d}, mv: {d}, tn {s}", .{ try ResourceIndexing.getIndexByName("Sprite"), try ResourceIndexing.getIndexByName("Transform"), rmv_index, tn });
 
     std.debug.print("spawn started\n", .{});
     for (0..20) |_| {
@@ -223,10 +194,12 @@ pub fn postInit(game: *Game, allocator: std.mem.Allocator) !void {
     // _ = try game.ecs_inst.addComponent(Movable, ent);
     // _ = try game.ecs_inst.addComponent(Sprite, ent);
 
-    _ = try game.ecs_inst.spawnOne(&.{ Movable, Sprite });
-
+    const ent = try game.ecs_inst.spawnOne(&.{ Movable, Sprite });
+    _ = try game.ecs_inst.addComponentByName(ent.entity, "Transform");
+    const x = try game.ecs_inst.getComponent(Transform, ent.entity);
+    x.pos = 88.88;
     const flags = Ecs.ComponentIndexing.getTypeFlags(&.{ Transform, Movable });
-    std.debug.print("Flags comps: {d}\n", .{flags});
+    std.debug.print("Flags comps: {d}, ent {d}\n", .{ flags, x.pos });
     //const components = ecs.getComponentFlag(Transform) | ecs.getComponentFlag(Movable);
     var en_it: ?Ecs.Entities.Iterator = game.ecs_inst.entities.getIterator(&.{ Transform, Movable });
     //const Res = ecs.generateStruct(&.{ Transform, Movable, Sprite });
