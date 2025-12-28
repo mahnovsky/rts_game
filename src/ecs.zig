@@ -450,7 +450,6 @@ pub fn CreateEcs(comptime Space: type) type {
     return struct {
         const Self = @This();
         pub const ComponentIndexing = Indexing.CreateTypeIndexing(Space);
-        pub const ResourceIndexing = Indexing.CreateTypeIndexing(Self);
         pub const Entities = CreateEntities(Space);
         allocator: Allocator,
         components: std.ArrayList(ComponentContainer),

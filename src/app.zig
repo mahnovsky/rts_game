@@ -69,6 +69,7 @@ pub const App = struct {
     text_render: tr.TextRender,
     frame_info: FrameInfo,
     editor: Editor,
+    game: *Game,
 
     pub fn init(width: u32, height: u32, allocator: std.mem.Allocator) AppInitError!Self {
         _ = glfw.glfwSetErrorCallback(errorCallback);
@@ -113,6 +114,9 @@ pub const App = struct {
             std.log.debug("font id {d}", .{font_id.index});
         }
 
+        var game = try Game.init(allocator, width, height);
+        try game.postInit(allocator);
+
         return Self{
             .window = window,
             .width = width,
@@ -121,6 +125,7 @@ pub const App = struct {
             .text_render = text_render,
             .frame_info = .{},
             .editor = Editor.init(allocator),
+            .game = game,
         };
     }
 
@@ -130,20 +135,20 @@ pub const App = struct {
         self.window.destroy();
     }
 
-    pub fn run(self: *Self, game: *Game) !void {
+    pub fn run(self: *Self) !void {
         while (!self.window.isWindowShouldClose()) {
             self.frame_info.frameBegin();
             self.window.frameBegin();
 
-            try game.update(self.frame_info.frame_time);
+            try self.game.update(self.window, self.frame_info.frame_time);
 
             gl.glClear(gl.GL_COLOR_BUFFER_BIT);
 
-            game.draw();
+            self.game.draw();
 
             self.window.frameEnd();
 
-            try self.editor.update(self, game);
+            try self.editor.update(self, self.game);
 
             self.frame_info.frameEnd();
         }

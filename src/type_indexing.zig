@@ -110,4 +110,5 @@ inline fn prettyTypeName(comptime ctype: type) [:0]const u8 {
     if (std.mem.lastIndexOf(u8, name, ".")) |index| {
         return name[index + 1 .. :0];
     }
+    return "";
 }

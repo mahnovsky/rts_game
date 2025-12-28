@@ -85,7 +85,7 @@ pub const Editor = struct {
                     try self.pushCommand(.{
                         .OpenTextureView = .{
                             .atl = game.map.render_data.atlas,
-                            .orig = game.app.window.window.?,
+                            .orig = application.window.window.?,
                         },
                     });
                 }
