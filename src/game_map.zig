@@ -109,10 +109,14 @@ pub const YamlSerializer = struct {
     }
 
     fn save(gpa: Allocator, map_data: *const MapData) []u8 {
-        var list: std.ArrayList(u8) = .empty;
-        yaml.stringify(gpa, map_data.*, list.writer(gpa)) catch return &.{};
-
-        return list.toOwnedSlice(gpa) catch &.{};
+        var body = std.Io.Writer.Allocating.init(gpa);
+        defer body.deinit();
+        yaml.stringify(
+            gpa,
+            map_data.*,
+            &body.writer,
+        ) catch return &.{};
+        return body.toOwnedSlice() catch unreachable;
     }
 };
 

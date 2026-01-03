@@ -130,6 +130,7 @@ pub const App = struct {
     }
 
     pub fn deinit(self: *Self) void {
+        self.game.deinit(self.allocator);
         self.text_render.deinit(self.allocator);
         self.editor.deinit();
         self.window.destroy();

@@ -41,8 +41,9 @@
             .hash = "TrueType-0.0.0-Ne-mWHIGAQBwHsiS9z_vbr1SkVZCkG01Vpzrs079dzIO",
         },
         .zig_yaml = .{
-            .url = "https://github.com/kubkon/zig-yaml/archive/refs/tags/0.1.1.tar.gz",
-            .hash = "zig_yaml-0.1.0-C1161miEAgBCwL3YAEQZwV_4GyaaT2Xqj9nKB6hNe_TL",
+            .path = "libs/zig-yaml",
+            //    .url = "https://github.com/kubkon/zig-yaml/archive/refs/tags/0.2.0.tar.gz",
+            //    //.hash = "zig_yaml-0.2.0-C1161miEAgBCwL3YAEQZwV_4GyaaT2Xqj9nKB6hNe_TL",
         },
     },
     .paths = .{
