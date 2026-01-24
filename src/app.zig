@@ -8,6 +8,11 @@ const shaders = @import("shaders.zig");
 const Editor = @import("editor.zig").Editor;
 const Window = @import("Window.zig");
 const Utils = @import("utils.zig");
+const ObjectStorage = @import("ObjectStorage.zig");
+var buffer: [1024 * 8]u8 = undefined;
+var fba = std.heap.FixedBufferAllocator.init(&buffer);
+const context_allocator = fba.allocator();
+pub var context: ObjectStorage = .init(context_allocator);
 
 const gl = @cImport({
     @cInclude("glad/glad.h");
@@ -19,14 +24,13 @@ const glfw = @cImport({
 
 const opengl = @import("opengl.zig");
 const zm = @import("zm");
-
 const c_cast = std.zig.c_translation.cast;
 const warn = std.log.warn;
 const panic = std.debug.panic;
 
 export fn errorCallback(err: c_int, description: [*c]const u8) void {
     _ = err;
-    panic("Error: {*}\n", .{description});
+    panic("Error: {s}\n", .{description});
 }
 
 const AppInitError = error{
@@ -62,6 +66,7 @@ const FrameInfo = struct {
 pub const App = struct {
     const Self = @This();
 
+    pub const glsl_version: [*c]const u8 = "#version 150";
     window: *Window,
     width: u32,
     height: u32,
@@ -71,7 +76,7 @@ pub const App = struct {
     editor: Editor,
     game: *Game,
 
-    pub fn init(width: u32, height: u32, allocator: std.mem.Allocator) AppInitError!Self {
+    pub fn init(width: u32, height: u32, allocator: std.mem.Allocator) AppInitError!*Self {
         _ = glfw.glfwSetErrorCallback(errorCallback);
 
         if (glfw.glfwInit() == glfw.GL_FALSE) {
@@ -79,7 +84,13 @@ pub const App = struct {
             return error.FailedInitGLFW;
         }
 
+        glfw.glfwWindowHint(glfw.GLFW_CONTEXT_VERSION_MAJOR, 3);
+        glfw.glfwWindowHint(glfw.GLFW_CONTEXT_VERSION_MINOR, 2);
+        glfw.glfwWindowHint(glfw.GLFW_OPENGL_PROFILE, glfw.GLFW_OPENGL_CORE_PROFILE); // 3.2+ only
+        glfw.glfwWindowHint(glfw.GLFW_OPENGL_FORWARD_COMPAT, glfw.GL_TRUE); // Required on Mac
+
         const window = try Window.create(allocator, width, height, "Application");
+        try opengl.init(&glfw.glfwGetProcAddress);
 
         opengl.clearColor(.{ 0.2, 0.3, 0.3 });
 
@@ -115,9 +126,9 @@ pub const App = struct {
         }
 
         var game = try Game.init(allocator, width, height);
-        try game.postInit(allocator);
+        try game.postInit(window);
 
-        return Self{
+        try context.addResource(Self, Self{
             .window = window,
             .width = width,
             .height = height,
@@ -126,14 +137,16 @@ pub const App = struct {
             .frame_info = .{},
             .editor = Editor.init(allocator),
             .game = game,
-        };
+        });
+
+        return context.getResource(Self).?;
     }
 
     pub fn deinit(self: *Self) void {
         self.game.deinit(self.allocator);
         self.text_render.deinit(self.allocator);
         self.editor.deinit();
-        self.window.destroy();
+        self.window.destroy(self.allocator);
     }
 
     pub fn run(self: *Self) !void {

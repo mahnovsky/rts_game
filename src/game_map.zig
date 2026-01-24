@@ -115,7 +115,7 @@ pub const YamlSerializer = struct {
             gpa,
             map_data.*,
             &body.writer,
-        ) catch return &.{};
+        ) catch unreachable;
         return body.toOwnedSlice() catch unreachable;
     }
 };

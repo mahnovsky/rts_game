@@ -8,12 +8,21 @@ const Window = @import("Window.zig");
 const utils = @import("utils.zig");
 const Serializer = @import("game_map.zig").Serializer;
 const YamlSerializer = @import("game_map.zig").YamlSerializer;
+const imgui = @import("imgui.zig");
 const glfw = @cImport({
     @cInclude("glfw/glfw3.h");
 });
+pub const CommandType = enum {
+    OpenEditorWindow,
+    OpenTextureView,
+    PickTextureIndex,
+    ClickOnMap,
+    SaveCurrentMap,
+};
 
-pub const Command = union(enum) {
+pub const Command = union(CommandType) {
     const Self = @This();
+    OpenEditorWindow: void,
     OpenTextureView: struct {
         atl: atlas.Atlas,
         orig: *anyopaque,
@@ -33,6 +42,7 @@ pub const Editor = struct {
     command_queue: std.ArrayList(Command),
     texture_view_window: ?texture_view.TextureViewWindow,
     tile_index: u16 = 0,
+    editor_window: ?imgui.Handle = null,
 
     pub fn init(gpa: std.mem.Allocator) Self {
         return .{
@@ -47,6 +57,56 @@ pub const Editor = struct {
             self.texture_view_window.?.close();
         }
         self.command_queue.deinit(self.gpa);
+    }
+
+    fn onButtonPressed(user_data: *anyopaque, handle: []const u8) void {
+        const self: *Self = @ptrCast(@alignCast(user_data));
+        std.debug.print("On Button pressed {s}\n", .{handle});
+        const application = app.context.getResource(app.App).?;
+        const game = app.context.getResource(Game).?;
+
+        if (std.meta.stringToEnum(CommandType, handle)) |command| {
+            switch (command) {
+                .OpenTextureView => self.pushCommand(.{ .OpenTextureView = .{
+                    .atl = game.map.render_data.atlas,
+                    .orig = @ptrCast(application.window.window.?),
+                } }) catch unreachable,
+                .SaveCurrentMap => self.pushCommand(.SaveCurrentMap) catch unreachable,
+                else => {},
+            }
+        }
+    }
+
+    fn openWindow(self: *Self, main_wnd: *Window) !void {
+        if (self.editor_window != null) {
+            std.log.warn("Editor window already exist", .{});
+            return;
+        }
+
+        var children = try std.ArrayList(imgui.Element).initCapacity(self.gpa, 10);
+        try children.append(self.gpa, .{ .Button = .{
+            .name = "Open tiles window",
+            .handle = @tagName(CommandType.OpenTextureView),
+            .size = .{ .x = 200, .y = 50 },
+            .user_data = self,
+            .callback = &onButtonPressed,
+        } });
+
+        try children.append(self.gpa, .{ .Button = .{
+            .name = "Save",
+            .handle = @tagName(CommandType.SaveCurrentMap),
+            .size = .{ .x = 200, .y = 50 },
+            .user_data = self,
+            .callback = &onButtonPressed,
+        } });
+
+        const wnd: imgui.Window = .{
+            .title = "Editor",
+            .size = .{ .x = 400, .y = 400 },
+            .children = children,
+        };
+
+        self.editor_window = try main_wnd.im_context.addWindow(self.gpa, wnd);
     }
 
     pub fn pushCommand(self: *Self, command: Command) !void {
@@ -78,28 +138,15 @@ pub const Editor = struct {
                 }
             }
         }
-
-        if (application.window.getLastMouseEvent()) |event| {
-            if (event.state == .Press and event.btn == .Left) {
-                if (pos[0] < 100 and pos[1] < 100) {
-                    try self.pushCommand(.{
-                        .OpenTextureView = .{
-                            .atl = game.map.render_data.atlas,
-                            .orig = application.window.window.?,
-                        },
-                    });
-                }
-                if (pos[0] > 100 and pos[0] < 200 and pos[1] < 100) {
-                    try self.pushCommand(.SaveCurrentMap);
-                }
-            }
-        }
     }
 
     pub fn processCommands(self: *Self, application: *app.App, game: *Game) !void {
         if (self.command_queue.items.len > 0) {
             for (self.command_queue.items) |cmd| {
                 switch (cmd) {
+                    .OpenEditorWindow => {
+                        try self.openWindow(application.window);
+                    },
                     .OpenTextureView => |view_cmd| {
                         game.move_camera = false;
                         try self.showTextureViewWindow(view_cmd.atl, view_cmd.orig);

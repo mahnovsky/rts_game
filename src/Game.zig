@@ -11,13 +11,9 @@ const editor = @import("editor.zig");
 const ecs = @import("ecs.zig");
 const ObjectStorage = @import("ObjectStorage.zig");
 const Window = @import("Window.zig");
-
+const imgui = @import("imgui.zig");
+const app = @import("app.zig");
 const Game = @This();
-var buffer: [1024 * 8]u8 = undefined;
-var fba = std.heap.FixedBufferAllocator.init(&buffer);
-const allocator = fba.allocator();
-var context: ObjectStorage = .init(allocator);
-
 const CamSpeed: f32 = 200;
 const BorderOffset: i32 = 20;
 const Rand = struct {
@@ -39,6 +35,7 @@ fn initRandom() !void {
 const World = struct {};
 const Ecs = ecs.CreateEcs(World);
 var game_instance: ?*Game = null;
+gpa: std.mem.Allocator,
 width: u32,
 height: u32,
 map: GameMap,
@@ -76,7 +73,8 @@ pub fn init(gpa: std.mem.Allocator, width: u32, height: u32) !*Game {
     const map_data = try MapData.load(gpa, data, Serializer.init(YamlSerializer));
 
     std.log.debug("test map: {d}, {d}, {d}", .{ map_data.width, map_data.height, map_data.tile_data.len });
-    try context.addResource(Game, .{
+    try app.context.addResource(Game, .{
+        .gpa = gpa,
         .map = try GameMap.init(
             gpa,
             "./data/GRAPHICS/tilesets/summer/terrain/summer.png",
@@ -92,7 +90,7 @@ pub fn init(gpa: std.mem.Allocator, width: u32, height: u32) !*Game {
         .ecs_inst = try Ecs.init(gpa),
     });
 
-    return context.getResource(Game).?;
+    return app.context.getResource(Game).?;
 }
 
 pub fn deinit(game: *Game, gpa: std.mem.Allocator) void {
@@ -100,7 +98,7 @@ pub fn deinit(game: *Game, gpa: std.mem.Allocator) void {
     game.ecs_inst.deinit();
 }
 
-pub fn postInit(game: *Game, _: std.mem.Allocator) !void {
+pub fn postInit(game: *Game, _: *Window) !void {
     const Movable = struct {
         const Self = @This();
         component: ecs.Component,
@@ -169,7 +167,7 @@ pub fn postInit(game: *Game, _: std.mem.Allocator) !void {
 
         pub fn deinit(_: *Self) void {}
     };
-    try context.addResource(GameMap, game.map);
+    try app.context.addResource(GameMap, game.map);
 
     std.debug.print("spawn started\n", .{});
     for (0..20) |_| {
@@ -235,6 +233,7 @@ pub fn postInit(game: *Game, _: std.mem.Allocator) !void {
     // }
 
     //std.log.debug("transform {d}, movable {d}", .{ tr.component.type_index, mv.component.type_index });
+
 }
 
 fn applyCameraOffset(game: *Game) void {
@@ -273,7 +272,7 @@ pub fn update(game: *Game, window: *Window, frame_time: f64) !void {
 
 pub fn draw(game: *Game) void {
     //game.map.draw(&game.camera);
-    if (context.getResource(GameMap)) |map| {
+    if (app.context.getResource(GameMap)) |map| {
         map.draw(&game.camera);
     }
 }

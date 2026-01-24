@@ -1,7 +1,9 @@
 const Window = @This();
+const App = @import("app.zig").App;
 const std = @import("std");
 const opengl = @import("opengl.zig");
-const glfw = @cImport({
+const imgui = @import("imgui.zig");
+pub const glfw = @cImport({
     @cInclude("glfw/glfw3.h");
 });
 var buffer: [1024]u8 = undefined;
@@ -32,12 +34,13 @@ pub const MouseBtnEvent = struct {
 var windows: std.ArrayList(Window) = .empty; //(window_allocator.allocator());
 
 window: ?*glfw.GLFWwindow,
+im_context: imgui.Context,
 mouse_events: std.ArrayList(MouseBtnEvent),
 mouse_button_state: [3]bool = [_]bool{ false, false, false },
 
 fn mouseCallback(window: ?*glfw.GLFWwindow, button: c_int, action: c_int, _: c_int) callconv(.c) void {
     for (windows.items) |*wnd| {
-        if (wnd.window == window) {
+        if (wnd.window == window and !wnd.im_context.isInputOnUI()) {
             wnd.onMouseAction(button, action) catch {};
             break;
         }
@@ -45,8 +48,6 @@ fn mouseCallback(window: ?*glfw.GLFWwindow, button: c_int, action: c_int, _: c_i
 }
 
 pub fn create(_: std.mem.Allocator, width: u32, height: u32, title: []const u8) !*Window {
-    glfw.glfwWindowHint(glfw.GLFW_CONTEXT_VERSION_MAJOR, 3);
-    glfw.glfwWindowHint(glfw.GLFW_CONTEXT_VERSION_MINOR, 3);
     const window = glfw.glfwCreateWindow(
         @intCast(width),
         @intCast(height),
@@ -57,7 +58,6 @@ pub fn create(_: std.mem.Allocator, width: u32, height: u32, title: []const u8) 
 
     glfw.glfwMakeContextCurrent(window);
     errdefer glfw.glfwDestroyWindow(window);
-    try opengl.init(&glfw.glfwGetProcAddress);
 
     _ = glfw.glfwSetMouseButtonCallback(
         window,
@@ -66,14 +66,16 @@ pub fn create(_: std.mem.Allocator, width: u32, height: u32, title: []const u8) 
 
     try windows.append(window_allocator.allocator(), .{
         .window = window,
+        .im_context = try .init(@ptrCast(window)),
         .mouse_events = .empty,
     });
 
     return &windows.items[windows.items.len - 1];
 }
 
-pub fn destroy(self: *Window) void {
+pub fn destroy(self: *Window, gpa: std.mem.Allocator) void {
     self.mouse_events.deinit(allocator);
+    self.im_context.deinit(gpa);
     glfw.glfwDestroyWindow(self.window);
 }
 
@@ -87,6 +89,8 @@ pub fn frameBegin(self: *Window) void {
 }
 
 pub fn frameEnd(self: Window) void {
+    imgui.draw_imgui(&self.im_context);
+
     glfw.glfwSwapBuffers(self.window);
     glfw.glfwPollEvents();
 }
@@ -112,11 +116,17 @@ pub fn getCursorPos(self: Window) @Vector(2, i32) {
 }
 
 pub fn isMouseButtonPressed(self: Window, btn: MouseButton) bool {
-    return glfw.glfwGetMouseButton(self.window, @intFromEnum(btn)) == glfw.GLFW_PRESS;
+    if (self.getLastMouseEvent()) |e| {
+        return e.btn == btn and e.state == .Press;
+    }
+    return false; //glfw.glfwGetMouseButton(self.window, @intFromEnum(btn)) == glfw.GLFW_PRESS;
 }
 
 pub fn isMouseButtonReleased(self: Window, btn: MouseButton) bool {
-    return glfw.glfwGetMouseButton(self.window, @intFromEnum(btn)) == glfw.GLFW_RELEASE;
+    if (self.getLastMouseEvent()) |e| {
+        return e.btn == btn and e.state == .Release;
+    }
+    return false; //return glfw.glfwGetMouseButton(self.window, @intFromEnum(btn)) == glfw.GLFW_RELEASE;
 }
 
 pub fn isKeyButtonPressed(self: Window, btn: Key) bool {

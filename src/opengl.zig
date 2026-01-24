@@ -1,7 +1,7 @@
 const gl = @cImport({
     @cInclude("glad/glad.h");
 });
-
+const sokol = @import("sokol");
 const std = @import("std");
 const zm = @import("zm");
 const utils = @import("utils.zig");
@@ -17,7 +17,13 @@ const Handle = gl.GLuint;
 const Vec3 = @Vector(3, f32);
 const Color = @Vector(3, u8);
 const ColorF = @Vector(3, f32);
-pub const GLAPIENTRY: std.builtin.CallingConvention = .{ .x86_64_win = .{} };
+const builtin = @import("builtin");
+pub const GLAPIENTRY: std.builtin.CallingConvention = blk: {
+    if (builtin.target.os.tag == .windows) {
+        break :blk .{ .x86_64_win = .{} };
+    }
+    break :blk .c;
+};
 
 const OpenGLError = error{FailedInitGLAD};
 
@@ -55,8 +61,10 @@ fn MessageCallback(_: gl.GLenum, errType: gl.GLenum, _: gl.GLuint, severity: gl.
 }
 
 pub fn setErrorCallback() void {
-    gl.glEnable(gl.GL_DEBUG_OUTPUT);
-    gl.glDebugMessageCallback(MessageCallback, undefined);
+    if (gl.glad_glDebugMessageCallback) |cb| {
+        gl.glEnable(gl.GL_DEBUG_OUTPUT);
+        cb(MessageCallback, undefined);
+    }
 }
 
 pub const RenderState = enum(u32) {

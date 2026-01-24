@@ -28,6 +28,15 @@ pub inline fn intValuesFromFields(comptime E: type, comptime fields: []const std
     }
 }
 
+pub fn stringToEnum(comptime T: type, s: []const u8) ?T {
+    inline for (std.meta.fields(T)) |field| {
+        if (std.mem.eql(u8, field.name, s)) {
+            return @field(T, field.name);
+        }
+    }
+    return null; // or return an error set
+}
+
 /// Returns the set of all named values in the given enum, in
 /// declaration order.
 pub fn values(comptime E: type) [len(E)]E {
@@ -52,7 +61,7 @@ pub fn flags(comptime x: anytype) u32 {
 }
 
 pub fn readFileData(gpa: std.mem.Allocator, file_path: []const u8) ![]u8 {
-    var file = try std.fs.cwd().openFile(file_path, .{});
+    var file = try std.fs.cwd().openFile(file_path, .{ .mode = .read_only });
     defer file.close();
 
     return try file.readToEndAlloc(gpa, std.math.maxInt(usize));
