@@ -68,8 +68,8 @@ pub fn readFileData(gpa: std.mem.Allocator, file_path: []const u8) ![]u8 {
 }
 
 pub fn writeFileData(file_path: []const u8, bytes: []const u8) !void {
-    var file = try std.fs.cwd().openFile(file_path, .{ .mode = .write_only });
+    var file = try std.fs.cwd().createFile(file_path, .{});
     defer file.close();
 
-    _ = try file.write(bytes);
+    _ = try file.writeAll(bytes);
 }

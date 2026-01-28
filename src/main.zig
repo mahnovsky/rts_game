@@ -9,7 +9,7 @@ pub const std_options: std.Options = .{
     // .warn will show errors and warnings
     // .info will show errors, warnings, and informational messages
     // .debug (default in Debug mode) shows all messages
-    .log_level = .warn,
+    .log_level = .debug,
 };
 
 pub fn main() anyerror!u8 {

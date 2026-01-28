@@ -2,8 +2,8 @@ const std = @import("std");
 const Atlas = @import("atlas.zig").Atlas;
 const GameMap = @import("game_map.zig").GameMap;
 const MapData = @import("game_map.zig").MapData;
-const Serializer = @import("game_map.zig").Serializer;
-const YamlSerializer = @import("game_map.zig").YamlSerializer;
+const Serializer = @import("serializer.zig").Serializer;
+const YamlSerializer = @import("serializer.zig").YamlSerializer;
 const zm = @import("zm");
 const App = @import("app.zig").App;
 const utils = @import("utils.zig");
@@ -13,6 +13,7 @@ const ObjectStorage = @import("ObjectStorage.zig");
 const Window = @import("Window.zig");
 const imgui = @import("imgui.zig");
 const app = @import("app.zig");
+const Assets = @import("Assets.zig");
 const Game = @This();
 const CamSpeed: f32 = 200;
 const BorderOffset: i32 = 20;
@@ -32,9 +33,13 @@ fn initRandom() !void {
     });
 }
 
+pub const Args = struct {
+    width: u32 = 800,
+    height: u32 = 600,
+};
+
 const World = struct {};
 const Ecs = ecs.CreateEcs(World);
-var game_instance: ?*Game = null;
 gpa: std.mem.Allocator,
 width: u32,
 height: u32,
@@ -45,8 +50,11 @@ camera: zm.Mat4f,
 camera_offset: zm.Vec2f,
 move_camera: bool,
 ecs_inst: Ecs,
+map_bounds: @Vector(2, f32),
 
-pub fn init(gpa: std.mem.Allocator, width: u32, height: u32) !*Game {
+pub fn initInplace(gpa: std.mem.Allocator, game: *Game, args: Args) !void {
+    const width = args.width;
+    const height = args.height;
     const proj = zm.Mat4f.orthographic(
         0,
         @floatFromInt(width),
@@ -56,31 +64,28 @@ pub fn init(gpa: std.mem.Allocator, width: u32, height: u32) !*Game {
         100,
     );
 
-    try initRandom();
-    const rand = Rand.get();
-    const cols = 40;
-    const rows = 40;
-    const map = try gpa.alloc(u16, cols * rows);
-    defer gpa.free(map);
-    for (0..rows) |y| {
-        for (0..cols) |x| {
-            map[x + y * cols] = rand.intRangeAtMost(u16, 16, 255);
-        }
-    }
+    //try initRandom();
+    //const rand = Rand.get();
+    //const cols = 40;
+    //const rows = 40;
 
     const data = try utils.readFileData(gpa, "./data/maps/test_map.yaml");
     defer gpa.free(data);
-    const map_data = try MapData.load(gpa, data, Serializer.init(YamlSerializer));
+    const map_data = try MapData.load(gpa, data, Serializer(MapData).init(YamlSerializer(MapData)));
+    const map = try GameMap.init(
+        gpa,
+        "./data/GRAPHICS/tilesets/summer/terrain/summer.png",
+        map_data,
+        proj,
+    );
 
+    const map_size = map.getMapSize();
+    const right_border = map_size[0] - @as(f32, @floatFromInt(width - BorderOffset));
+    const top_border = map_size[1] - @as(f32, @floatFromInt(height - BorderOffset));
     std.log.debug("test map: {d}, {d}, {d}", .{ map_data.width, map_data.height, map_data.tile_data.len });
-    try app.context.addResource(Game, .{
+    game.* = .{
         .gpa = gpa,
-        .map = try GameMap.init(
-            gpa,
-            "./data/GRAPHICS/tilesets/summer/terrain/summer.png",
-            map_data,
-            proj,
-        ),
+        .map = map,
         .width = width,
         .height = height,
         .proj = proj,
@@ -88,17 +93,21 @@ pub fn init(gpa: std.mem.Allocator, width: u32, height: u32) !*Game {
         .camera_offset = .{ 0, 0 },
         .move_camera = true,
         .ecs_inst = try Ecs.init(gpa),
-    });
-
-    return app.context.getResource(Game).?;
+        .map_bounds = .{ right_border, top_border },
+    };
 }
 
 pub fn deinit(game: *Game, gpa: std.mem.Allocator) void {
     game.map.deinit(gpa);
     game.ecs_inst.deinit();
+    const assets = app.context.getResourceUnchecked(Assets);
+    assets.deinit(gpa);
 }
 
 pub fn postInit(game: *Game, _: *Window) !void {
+    try app.context.addResourceInplace(Assets, game.gpa, .{});
+    const a = app.context.getResourceUnchecked(Assets);
+    try a.load(game.gpa);
     const Movable = struct {
         const Self = @This();
         component: ecs.Component,
@@ -167,7 +176,6 @@ pub fn postInit(game: *Game, _: *Window) !void {
 
         pub fn deinit(_: *Self) void {}
     };
-    try app.context.addResource(GameMap, game.map);
 
     std.debug.print("spawn started\n", .{});
     for (0..20) |_| {
@@ -244,22 +252,25 @@ fn applyCameraOffset(game: *Game) void {
 pub fn processInput(game: *Game, window: *Window, frame_time: f64) !void {
     const pos = window.getCursorPos();
     if (game.move_camera) {
-        if (pos[0] < BorderOffset) {
+        // left
+        if (pos[0] < BorderOffset and game.camera_offset[0] < BorderOffset) {
             game.camera_offset[0] += @floatCast(frame_time * CamSpeed);
         }
 
-        if (pos[0] > (game.width - BorderOffset)) {
+        // right
+        // const right_border = map_size[0] - @as(f32, @floatFromInt(game.width - BorderOffset));
+        if (pos[0] > (game.width - BorderOffset) and @abs(game.camera_offset[0]) < game.map_bounds[0]) {
             game.camera_offset[0] -= @floatCast(frame_time * CamSpeed);
         }
 
-        if (pos[1] < BorderOffset) {
+        //const top_border = map_size[1] - @as(f32, @floatFromInt(game.height - BorderOffset));
+        if (pos[1] < BorderOffset and @abs(game.camera_offset[1]) < game.map_bounds[1]) {
             game.camera_offset[1] -= @floatCast(frame_time * CamSpeed);
         }
 
-        if (pos[1] > (game.height - BorderOffset)) {
+        if (pos[1] > (game.height - BorderOffset) and game.camera_offset[1] < BorderOffset) {
             game.camera_offset[1] += @floatCast(frame_time * CamSpeed);
         }
-
         game.applyCameraOffset();
     }
 }
@@ -271,8 +282,5 @@ pub fn update(game: *Game, window: *Window, frame_time: f64) !void {
 }
 
 pub fn draw(game: *Game) void {
-    //game.map.draw(&game.camera);
-    if (app.context.getResource(GameMap)) |map| {
-        map.draw(&game.camera);
-    }
+    game.map.draw(&game.camera);
 }

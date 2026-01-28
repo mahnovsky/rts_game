@@ -311,6 +311,33 @@ pub const Atlas = struct {
         };
     }
 
+    pub fn initGreedFromTexture(gpa: std.mem.Allocator, texture: opengl.Texture, cell_w: u16, cell_h: u16) !Self {
+        const width: u32 = texture.width;
+        const height: u32 = texture.height;
+
+        const cols = try std.math.divCeil(u32, width, cell_w);
+        const rows = try std.math.divCeil(u32, height, cell_h);
+        const rects = try gpa.alloc(Rect, cols * rows);
+
+        for (0..rows) |y| {
+            for (0..cols) |x| {
+                rects[x + y * cols] = .{
+                    .x = @as(u16, @intCast(x)) * cell_w,
+                    .y = @as(u16, @intCast(y)) * cell_h,
+                    .w = cell_w,
+                    .h = cell_h,
+                };
+            }
+        }
+
+        return .{
+            .texture_width = width,
+            .texture_height = height,
+            .texture = texture,
+            .rects = rects,
+            .symbol_base = 0,
+        };
+    }
     pub fn initGreed(gpa: std.mem.Allocator, image: *Image, cell_w: u16, cell_h: u16) !Self {
         const width: u32 = @intCast(image.width);
         const height: u32 = @intCast(image.height);

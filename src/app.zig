@@ -38,6 +38,14 @@ const AppInitError = error{
     FailedInitOpenGL,
 } || anyerror;
 
+pub const DataPath = struct {
+    path: []const u8,
+
+    pub fn getFullPath(self: *const @This(), allocator: std.mem.Allocator, file_name: []const u8) ![]const u8 {
+        return try std.fs.path.join(allocator, &.{ self.path, file_name });
+    }
+};
+
 const FrameInfo = struct {
     const Self = @This();
     begin_frame_time: f64 = 0,
@@ -124,8 +132,16 @@ pub const App = struct {
         if (text_render.getFontId("GoNotoCurrent-Regular.ttf")) |font_id| {
             std.log.debug("font id {d}", .{font_id.index});
         }
+        try context.addResourceInplace(Game, allocator, Game.Args{
+            .width = width,
+            .height = height,
+        });
 
-        var game = try Game.init(allocator, width, height);
+        try context.addResource(DataPath, .{ .path = "data" });
+        std.debug.print("DataPath {s}\n", .{context.getResourceUnchecked(DataPath).*.path});
+
+        //var game = try Game.init(allocator, width, height);
+        var game = context.getResourceUnchecked(Game);
         try game.postInit(window);
 
         try context.addResource(Self, Self{

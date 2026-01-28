@@ -6,8 +6,9 @@ const app = @import("app.zig");
 const Game = @import("Game.zig");
 const Window = @import("Window.zig");
 const utils = @import("utils.zig");
-const Serializer = @import("game_map.zig").Serializer;
-const YamlSerializer = @import("game_map.zig").YamlSerializer;
+const Serializer = @import("serializer.zig").Serializer;
+const YamlSerializer = @import("serializer.zig").YamlSerializer;
+const MapData = @import("game_map.zig").MapData;
 const imgui = @import("imgui.zig");
 const glfw = @cImport({
     @cInclude("glfw/glfw3.h");
@@ -154,10 +155,12 @@ pub const Editor = struct {
                     .PickTextureIndex => |index| {
                         self.tile_index = @truncate(index);
                         std.log.debug("new index {d}", .{self.tile_index});
+                        game.move_camera = true;
                     },
                     .ClickOnMap => |coords| game.map.tryReplaceTile(coords[0], coords[1], self.tile_index),
                     .SaveCurrentMap => {
-                        const data = try game.map.map_data.save(application.allocator, Serializer.init(YamlSerializer));
+                        //const data = try game.map.map_data.save(application.allocator, Serializer(MapData).init(YamlSerializer(MapData)));
+                        const data = try game.map.map_data.save(application.allocator, YamlSerializer);
                         defer application.allocator.free(data);
                         try utils.writeFileData("./data/maps/test_map.yaml", data);
                     },

@@ -1,0 +1,17 @@
+textures:
+  - uid: terrain_summer
+    path: GRAPHICS/tilesets/summer/terrain
+    file: summer.png
+  - uid: terrain_winter
+    path: GRAPHICS/tilesets/winter/terrain
+    file: winter.png
+
+atlases:
+  - uid: terrain_summer_atlas
+    texture: terrain_summer
+    greed_width: 32
+    greed_height: 32
+  - uid: terrain_summer_atlas
+    texture: terrain_winter
+    greed_width: 32
+    greed_height: 32

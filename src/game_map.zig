@@ -1,12 +1,11 @@
 const std = @import("std");
-const yaml = @import("yaml");
-const Yaml = @import("yaml").Yaml;
 const Atlas = @import("atlas.zig").Atlas;
 const Rect = @import("atlas.zig").Rect;
 const zigimg = @import("zigimg");
 const opengl = @import("opengl.zig");
 const shaders = @import("shaders.zig");
 const zm = @import("zm");
+const sr = @import("serializer.zig");
 const TextureView = @import("texture_view.zig").TextureView;
 
 const TileScale: f32 = 2;
@@ -55,71 +54,6 @@ fn makeVertexData(gpa: std.mem.Allocator, buffer: *std.ArrayListUnmanaged(opengl
 
 const Allocator = std.mem.Allocator;
 
-pub const Serializer = struct {
-    const Self = @This();
-    saveFunc: ?*const fn (Allocator, *const MapData) []u8 = null,
-    loadFunc: ?*const fn (Allocator, []u8) MapData = null,
-
-    pub fn init(comptime T: type) Serializer {
-        const gen = struct {
-            fn save(arena: Allocator, map_data: *const MapData) []u8 {
-                return T.save(arena, map_data);
-            }
-
-            fn load(arena: Allocator, data: []u8) MapData {
-                return T.load(arena, data);
-            }
-        };
-
-        return .{
-            .saveFunc = gen.save,
-            .loadFunc = gen.load,
-        };
-    }
-
-    fn save(self: Self, gpa: Allocator, map_data: *const MapData) []u8 {
-        if (self.saveFunc) |saveFunc| {
-            return saveFunc(gpa, map_data);
-        }
-        unreachable;
-    }
-
-    fn load(self: Self, gpa: Allocator, data: []u8) MapData {
-        if (self.loadFunc) |loadFunc| {
-            return loadFunc(gpa, data);
-        }
-        unreachable;
-    }
-};
-
-pub const YamlSerializer = struct {
-    const Self = @This();
-
-    fn load(gpa: Allocator, data: []u8) MapData {
-        var doc = Yaml{ .source = data };
-
-        doc.load(gpa) catch {
-            return MapData.empty;
-        };
-        defer doc.deinit(gpa);
-
-        const map_data = doc.parse(gpa, MapData) catch MapData.empty;
-
-        return map_data;
-    }
-
-    fn save(gpa: Allocator, map_data: *const MapData) []u8 {
-        var body = std.Io.Writer.Allocating.init(gpa);
-        defer body.deinit();
-        yaml.stringify(
-            gpa,
-            map_data.*,
-            &body.writer,
-        ) catch unreachable;
-        return body.toOwnedSlice() catch unreachable;
-    }
-};
-
 pub const MapData = struct {
     const Self = @This();
     const TileSize: f32 = 32 * TileScale;
@@ -129,10 +63,11 @@ pub const MapData = struct {
     height: u32,
     tile_data: []u16,
 
-    pub fn load(gpa: std.mem.Allocator, data: []u8, s: Serializer) !MapData {
+    pub fn load(gpa: std.mem.Allocator, data: []u8, s: sr.Serializer(MapData)) !MapData {
         const map_data = s.load(gpa, data);
         defer map_data.deinit(gpa);
-
+        std.debug.print("MapData {d} == {d}\n", .{ map_data.tile_data.len, map_data.width * map_data.height });
+        std.debug.assert(map_data.tile_data.len == map_data.width * map_data.height);
         return .{
             .width = map_data.width,
             .height = map_data.height,
@@ -140,8 +75,8 @@ pub const MapData = struct {
         };
     }
 
-    pub fn save(self: Self, gpa: std.mem.Allocator, s: Serializer) ![]u8 {
-        return s.save(gpa, &self);
+    pub fn save(self: Self, gpa: std.mem.Allocator, comptime s: fn (comptime type) type) ![]u8 {
+        return sr.Serializer(MapData).init(s(MapData)).save(gpa, &self);
     }
 
     pub fn deinit(self: Self, gpa: std.mem.Allocator) void {
@@ -258,7 +193,7 @@ pub const GameMap = struct {
         self.map_data.deinit(gpa);
     }
 
-    pub fn draw(self: Self, camera: *const zm.Mat4f) void {
+    pub fn draw(self: *const Self, camera: *const zm.Mat4f) void {
         self.shader.use();
         self.shader.setUniformMatrix("Camera", camera.*);
         self.map_render.drawBegin();
@@ -275,14 +210,21 @@ pub const GameMap = struct {
         }
     }
 
-    pub fn isCoordsValid(self: Self, x: f32, y: f32) bool {
+    pub fn isCoordsValid(self: *const Self, x: f32, y: f32) bool {
         const w = @as(f32, @floatFromInt(self.map_data.width)) * MapData.TileSize;
         const h = @as(f32, @floatFromInt(self.map_data.height)) * MapData.TileSize;
 
         return x >= 0 and x <= w and y >= 0 and y <= h;
     }
 
-    pub fn convertScreen2TileCoords(self: Self, x: f32, y: f32) ?@Vector(2, u32) {
+    pub fn getMapSize(self: *const Self) @Vector(2, f32) {
+        return .{
+            @as(f32, @floatFromInt(self.map_data.width)) * MapData.TileSize,
+            @as(f32, @floatFromInt(self.map_data.height)) * MapData.TileSize,
+        };
+    }
+
+    pub fn convertScreen2TileCoords(self: *const Self, x: f32, y: f32) ?@Vector(2, u32) {
         if (!self.isCoordsValid(x, y)) {
             return null;
         }

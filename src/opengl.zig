@@ -404,6 +404,8 @@ pub const DrawingObject = struct {
 pub const Texture = struct {
     const Self = @This();
     handle: Handle,
+    width: u32,
+    height: u32,
 
     pub fn init(buf: []const u8, width: i32, height: i32, components: u32) Self {
         std.log.debug("Texture init w {d}, h {d}, components {d}", .{ width, height, components });
@@ -440,11 +442,16 @@ pub const Texture = struct {
         info("texture created, width: {d}, height: {d}, components: {d}", .{ width, height, components });
         return Self{
             .handle = handle,
+            .width = @intCast(width),
+            .height = @intCast(height),
         };
     }
 
     pub fn deinit(self: *Self) void {
-        gl.glDeleteTextures(1, self.handle);
+        if (gl.glad_glDeleteTextures) |f| {
+            f(1, &self.handle);
+        }
+        //gl.glDeleteTextures(1, self.handle);
         self.handle = 0;
     }
 

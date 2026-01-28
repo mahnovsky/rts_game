@@ -142,6 +142,7 @@ pub const TextureViewWindow = struct {
                 for (rects, 0..rects.len) |rect, index| {
                     if (rect.hitTest(pos_x, pos_y)) {
                         try self.editor.pushCommand(.{ .PickTextureIndex = @intCast(index) });
+                        self.close();
                         break;
                     }
                 }
