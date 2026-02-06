@@ -379,7 +379,8 @@ pub const Atlas = struct {
         };
     }
 
-    pub fn deinit(self: *Self, gpa: std.mem.Allocator) void {
+    pub fn deinit(self: *const Self, gpa: std.mem.Allocator) void {
+        std.debug.print("Atlas deinit asset \n", .{});
         gpa.free(self.rects);
     }
 

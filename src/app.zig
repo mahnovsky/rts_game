@@ -9,10 +9,10 @@ const Editor = @import("editor.zig").Editor;
 const Window = @import("Window.zig");
 const Utils = @import("utils.zig");
 const ObjectStorage = @import("ObjectStorage.zig");
-var buffer: [1024 * 8]u8 = undefined;
+var buffer: [1024 * 12]u8 = undefined;
 var fba = std.heap.FixedBufferAllocator.init(&buffer);
 const context_allocator = fba.allocator();
-pub var context: ObjectStorage = .init(context_allocator);
+pub var context: ObjectStorage.Storage(struct {}) = .init(context_allocator);
 
 const gl = @cImport({
     @cInclude("glad/glad.h");
@@ -132,16 +132,13 @@ pub const App = struct {
         if (text_render.getFontId("GoNotoCurrent-Regular.ttf")) |font_id| {
             std.log.debug("font id {d}", .{font_id.index});
         }
-        try context.addResourceInplace(Game, allocator, Game.Args{
-            .width = width,
-            .height = height,
-        });
-
         try context.addResource(DataPath, .{ .path = "data" });
         std.debug.print("DataPath {s}\n", .{context.getResourceUnchecked(DataPath).*.path});
 
-        //var game = try Game.init(allocator, width, height);
-        var game = context.getResourceUnchecked(Game);
+        var game = try context.addResourceInplace(Game, allocator, Game.Args{
+            .width = width,
+            .height = height,
+        });
         try game.postInit(window);
 
         try context.addResource(Self, Self{

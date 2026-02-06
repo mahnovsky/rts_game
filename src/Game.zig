@@ -69,9 +69,12 @@ pub fn initInplace(gpa: std.mem.Allocator, game: *Game, args: Args) !void {
     //const cols = 40;
     //const rows = 40;
 
+    var assets = try app.context.addResourceInplace(Assets, gpa, .{});
+    try assets.load(gpa);
+
     const data = try utils.readFileData(gpa, "./data/maps/test_map.yaml");
     defer gpa.free(data);
-    const map_data = try MapData.load(gpa, data, Serializer(MapData).init(YamlSerializer(MapData)));
+    const map_data = try assets.getAsset(MapData, "test_map");
     const map = try GameMap.init(
         gpa,
         "./data/GRAPHICS/tilesets/summer/terrain/summer.png",
@@ -101,13 +104,10 @@ pub fn deinit(game: *Game, gpa: std.mem.Allocator) void {
     game.map.deinit(gpa);
     game.ecs_inst.deinit();
     const assets = app.context.getResourceUnchecked(Assets);
-    assets.deinit(gpa);
+    assets.deinit(game.gpa);
 }
 
 pub fn postInit(game: *Game, _: *Window) !void {
-    try app.context.addResourceInplace(Assets, game.gpa, .{});
-    const a = app.context.getResourceUnchecked(Assets);
-    try a.load(game.gpa);
     const Movable = struct {
         const Self = @This();
         component: ecs.Component,

@@ -104,7 +104,7 @@ fn parseValue(self: Yaml, arena: Allocator, comptime T: type, value: Value) Erro
         .pointer => if (value.asList()) |list| {
             return self.parsePointer(arena, T, .{ .list = list });
         } else if (value.asScalar()) |scalar| {
-            return self.parsePointer(arena, T, .{ .scalar = try arena.dupe(u8, scalar) });
+            return self.parsePointer(arena, T, .{ .scalar = scalar });
         } else if (value.asMap()) |map| {
             return self.parsePointer(arena, T, .{ .map = map });
         } else return error.TypeMismatch,

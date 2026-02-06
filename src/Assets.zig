@@ -5,20 +5,30 @@ const Atlas = @import("atlas.zig").Atlas;
 const sr = @import("serializer.zig");
 const opengl = @import("opengl.zig");
 const zigimg = @import("zigimg");
+const map = @import("game_map.zig");
+const ObjectStorage = @import("ObjectStorage.zig");
 const Image = zigimg.Image;
 const DataPath = app.DataPath;
 const Self = @This();
+
+pub const Error = error{
+    AssetNotExist,
+    AssetAlreadyExist,
+    NoSuchAssetType,
+};
 
 pub const Type = enum {
     Texture,
     Atlas,
     Font,
+    MapData,
 };
 
-const Content = union(Type) {
+pub const Content = union(Type) {
     Texture: opengl.Texture,
     Atlas: Atlas,
     Font: void,
+    MapData: map.MapData,
 
     fn deinit(self: *@This(), gpa: std.mem.Allocator) void {
         switch (self.*) {
@@ -26,7 +36,12 @@ const Content = union(Type) {
                 atl.deinit(gpa);
             },
             .Texture => |*texture| {
+                std.debug.print("Texture deinit asset \n", .{});
                 texture.deinit();
+            },
+            .MapData => |*map_data| {
+                std.debug.print("MapData deinit asset \n", .{});
+                map_data.deinit(gpa);
             },
             else => {},
         }
@@ -37,7 +52,8 @@ pub const Handle = struct {
     type: Type,
     name: []const u8,
 };
-const TextureDesc = struct {
+
+const FileAssetDesc = struct {
     uid: []const u8,
     path: []const u8,
     file: []const u8,
@@ -51,38 +67,73 @@ const AtlasDesc = struct {
 };
 
 const Lib = struct {
-    textures: []TextureDesc,
+    textures: []FileAssetDesc,
+    maps: []FileAssetDesc,
     atlases: []AtlasDesc,
 
     fn parse(gpa: std.mem.Allocator, data: []const u8) Lib {
         return sr.Serializer(Lib).init(sr.YamlSerializer(Lib)).load(gpa, data);
     }
+
+    fn deinitFileAssets(gpa: std.mem.Allocator, slice: []FileAssetDesc) void {
+        for (slice) |info| {
+            gpa.free(info.uid);
+            gpa.free(info.path);
+            gpa.free(info.file);
+        }
+        gpa.free(slice);
+    }
+
+    fn deinit(self: *const @This(), gpa: std.mem.Allocator) void {
+        deinitFileAssets(gpa, self.textures);
+        deinitFileAssets(gpa, self.maps);
+        for (self.atlases) |info| {
+            std.debug.print("Deinit Lib {s}\n", .{info.uid});
+            gpa.free(info.uid);
+            gpa.free(info.texture);
+        }
+        gpa.free(self.atlases);
+    }
 };
 
 const SIZE = @typeInfo(Type).@"enum".fields.len;
-const Container = std.StringHashMap(Content);
-assets: [SIZE]Container = undefined,
+const Container = std.StringHashMap;
+var arena: std.heap.ArenaAllocator = .init(std.heap.page_allocator);
+key_allocator: std.mem.Allocator,
+objects: ObjectStorage.Storage(struct {}),
 
 pub fn initInplace(gpa: std.mem.Allocator, self: *Self, _: anytype) !void {
-    self.* = .{ .assets = blk: {
-        var temp: [SIZE]Container = undefined;
-
-        inline for (0..SIZE) |i| {
-            temp[i] = Container.init(gpa);
-        }
-
-        break :blk temp;
-    } };
+    self.* = .{
+        .key_allocator = arena.allocator(),
+        .objects = .init(gpa),
+    };
 }
 
 pub fn deinit(self: *Self, gpa: std.mem.Allocator) void {
-    for (&self.assets) |*assets| {
-        var it = assets.iterator();
-        while (it.next()) |item| {
-            item.value_ptr.deinit(gpa);
+    const content_info = @typeInfo(Content);
+    inline for (content_info.@"union".fields, 0..) |tag, i| {
+        const T = @FieldType(Content, tag.name);
+        if (self.objects.getResource(Container(T))) |assets| {
+            var it = assets.iterator();
+            const t: Type = @enumFromInt(i);
+            std.debug.print("deinit asset {d} {s}\n", .{ assets.count(), @tagName(t) });
+            while (it.next()) |item| {
+                var content = @unionInit(Content, tag.name, item.value_ptr.*);
+                content.deinit(gpa);
+            }
+            assets.deinit();
         }
-        assets.deinit();
     }
+    self.objects.deinit();
+    arena.deinit();
+}
+
+fn putAsset(self: *Self, comptime T: type, uid: []const u8, content: T) !void {
+    var asset_cont = self.objects.getResourceUnchecked(Container(T));
+    if (asset_cont.contains(uid)) {
+        return error.AssetAlreadyExist;
+    }
+    try asset_cont.put(try self.key_allocator.dupe(u8, uid), content);
 }
 
 pub fn load(self: *Self, gpa: std.mem.Allocator) !void {
@@ -90,14 +141,24 @@ pub fn load(self: *Self, gpa: std.mem.Allocator) !void {
     const full_path = try data_path.getFullPath(gpa, "AssetsLib.yaml");
     defer gpa.free(full_path);
     const data = try utils.readFileData(gpa, full_path);
+    defer gpa.free(data);
     std.debug.print("Parse data: {s}, path: {s}\n", .{ data, full_path });
     const lib = Lib.parse(gpa, data);
+    defer lib.deinit(gpa);
     std.debug.print("Assets loaded {s}, {s}\n", .{ lib.atlases[0].texture, lib.atlases[1].texture });
+
     try self.loadTextures(gpa, &lib);
     try self.loadAtlases(gpa, &lib);
+    try self.loadMaps(gpa, &lib);
+}
+
+fn addAsssetContainer(self: *Self, comptime T: type, gpa: std.mem.Allocator) !void {
+    const container = try self.objects.allocResource(Container(T));
+    container.* = .init(gpa);
 }
 
 fn loadTextures(self: *Self, gpa: std.mem.Allocator, lib: *const Lib) !void {
+    try self.addAsssetContainer(opengl.Texture, gpa);
     const data_path = app.context.getResourceUnchecked(DataPath);
     var read_buffer: [zigimg.io.DEFAULT_BUFFER_SIZE]u8 = undefined;
     for (lib.textures) |info| {
@@ -114,20 +175,31 @@ fn loadTextures(self: *Self, gpa: std.mem.Allocator, lib: *const Lib) !void {
         }
         const components = image.pixelFormat().channelCount();
         const texture = opengl.Texture.init(image.rawBytes(), width, height, components);
-        try self.assets[@intFromEnum(Type.Texture)].put(info.uid, .{ .Texture = texture });
-
+        try self.putAsset(opengl.Texture, info.uid, texture);
         std.debug.print("texture loaded {s}\n", .{info.uid});
     }
 }
 
 fn loadAtlases(self: *Self, gpa: std.mem.Allocator, lib: *const Lib) !void {
+    try self.addAsssetContainer(Atlas, gpa);
     for (lib.atlases) |info| {
-        if (self.assets[@intFromEnum(Type.Texture)].get(info.texture)) |texture| {
-            const atl = try Atlas.initGreedFromTexture(gpa, texture.Texture, info.greed_width, info.greed_height);
-            try self.assets[@intFromEnum(Type.Atlas)].put(info.uid, .{ .Atlas = atl });
-        } else {
-            std.log.err("failed to load atlas {s} \n", .{info.texture});
-        }
+        const texture = try self.getAsset(opengl.Texture, info.texture);
+        const atl = try Atlas.initGreedFromTexture(gpa, texture, info.greed_width, info.greed_height);
+        std.debug.print("asset load atlas {s}\n", .{info.uid});
+        self.putAsset(Atlas, info.uid, atl) catch unreachable;
+    }
+}
+
+fn loadMaps(self: *Self, gpa: std.mem.Allocator, lib: *const Lib) !void {
+    try self.addAsssetContainer(map.MapData, gpa);
+    const data_path = app.context.getResourceUnchecked(DataPath);
+    for (lib.maps) |info| {
+        const full_path = try std.fs.path.join(gpa, &.{ data_path.path, info.path, info.file });
+        defer gpa.free(full_path);
+        const data = try utils.readFileData(gpa, full_path);
+        defer gpa.free(data);
+        const map_data = try map.MapData.load(gpa, data, sr.YamlSerializer);
+        try self.putAsset(map.MapData, info.uid, map_data);
     }
 }
 
@@ -142,4 +214,11 @@ pub fn getAssetList(self: *const Self, gpa: std.mem.Allocator, asset_type: Type)
     }
 
     return res.toOwnedSlice(gpa);
+}
+
+pub fn getAsset(self: *const Self, comptime T: type, uid: []const u8) !T {
+    if (self.objects.getResource(Container(T))) |container| {
+        return container.get(uid) orelse error.AssetNotExist;
+    }
+    return error.NoSuchAssetType;
 }

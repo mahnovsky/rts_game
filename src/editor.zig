@@ -37,23 +37,48 @@ pub const Command = union(CommandType) {
     }
 };
 
+const Vec3 = struct {
+    x: f32,
+    y: f32,
+    z: f32,
+
+    fn initDefault() @This() {
+        return .{ .x = 0, .y = 0, .z = 0 };
+    }
+};
+
 pub const Editor = struct {
+    pub const TAGS = .{
+        .ignore_list = .{ "gpa", "command_queue" },
+        .points = .{ .add_default_item = &Vec3.initDefault },
+    };
     const Self = @This();
     gpa: std.mem.Allocator,
     command_queue: std.ArrayList(Command),
     texture_view_window: ?texture_view.TextureViewWindow,
     tile_index: u16 = 0,
     editor_window: ?imgui.Handle = null,
+    points: []Vec3,
+    name: []const u8,
 
     pub fn init(gpa: std.mem.Allocator) Self {
+        const name = gpa.alloc(u8, 4) catch unreachable;
+        std.mem.copyForwards(u8, name, "test");
+        const points = gpa.alloc(Vec3, 8) catch unreachable;
+        for (points) |*p| {
+            p.* = Vec3.initDefault();
+        }
         return .{
             .gpa = gpa,
             .command_queue = .empty,
             .texture_view_window = null,
+            .points = points,
+            .name = name,
         };
     }
 
     pub fn deinit(self: *Self) void {
+        std.debug.print("Actual text {s}\n", .{self.name});
         if (self.texture_view_window != null) {
             self.texture_view_window.?.close();
         }
@@ -101,12 +126,13 @@ pub const Editor = struct {
             .callback = &onButtonPressed,
         } });
 
-        const wnd: imgui.Window = .{
+        var wnd: imgui.Panel = .{
             .title = "Editor",
             .size = .{ .x = 400, .y = 400 },
             .children = children,
         };
 
+        wnd.reflectItem(Self, self.gpa, self);
         self.editor_window = try main_wnd.im_context.addWindow(self.gpa, wnd);
     }
 

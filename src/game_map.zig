@@ -63,16 +63,8 @@ pub const MapData = struct {
     height: u32,
     tile_data: []u16,
 
-    pub fn load(gpa: std.mem.Allocator, data: []u8, s: sr.Serializer(MapData)) !MapData {
-        const map_data = s.load(gpa, data);
-        defer map_data.deinit(gpa);
-        std.debug.print("MapData {d} == {d}\n", .{ map_data.tile_data.len, map_data.width * map_data.height });
-        std.debug.assert(map_data.tile_data.len == map_data.width * map_data.height);
-        return .{
-            .width = map_data.width,
-            .height = map_data.height,
-            .tile_data = try gpa.dupe(u16, map_data.tile_data),
-        };
+    pub fn load(gpa: std.mem.Allocator, data: []u8, s: fn (comptime type) type) !MapData {
+        return sr.Serializer(MapData).init(s(MapData)).load(gpa, data);
     }
 
     pub fn save(self: Self, gpa: std.mem.Allocator, comptime s: fn (comptime type) type) ![]u8 {
@@ -190,7 +182,7 @@ pub const GameMap = struct {
 
     pub fn deinit(self: *Self, gpa: std.mem.Allocator) void {
         self.render_data.deinit(gpa);
-        self.map_data.deinit(gpa);
+        //self.map_data.deinit(gpa);
     }
 
     pub fn draw(self: *const Self, camera: *const zm.Mat4f) void {

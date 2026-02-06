@@ -89,7 +89,7 @@ pub fn frameBegin(self: *Window) void {
 }
 
 pub fn frameEnd(self: Window) void {
-    imgui.draw_imgui(&self.im_context);
+    imgui.drawImgui(&self.im_context);
 
     glfw.glfwSwapBuffers(self.window);
     glfw.glfwPollEvents();

@@ -2,6 +2,7 @@ const std = @import("std");
 const yaml = @import("yaml");
 const Yaml = @import("yaml").Yaml;
 const Allocator = std.mem.Allocator;
+pub const CurrentSerializer = YamlSerializer;
 
 pub fn Serializer(comptime S: type) type {
     return struct {
@@ -48,7 +49,6 @@ pub fn YamlSerializer(comptime S: type) type {
 
         fn load(gpa: Allocator, data: []const u8) S {
             var doc = Yaml{ .source = data };
-
             doc.load(gpa) catch {
                 unreachable;
             };

@@ -11,7 +11,15 @@ atlases:
     texture: terrain_summer
     greed_width: 32
     greed_height: 32
-  - uid: terrain_summer_atlas
+  - uid: terrain_winter_atlas
     texture: terrain_winter
     greed_width: 32
     greed_height: 32
+maps:
+  - uid: test_map
+    path: maps
+    file: test_map.yaml
+tilesets:
+  - uid: summer_tileset
+    path: maps/tilesets
+    file: summer_tileset.yaml
