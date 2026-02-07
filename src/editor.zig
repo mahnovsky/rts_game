@@ -43,14 +43,30 @@ const Vec3 = struct {
     z: f32,
 
     fn initDefault() @This() {
-        return .{ .x = 0, .y = 0, .z = 0 };
+        return .{ .x = 33.1, .y = 10.2, .z = 0.20 };
     }
 };
+
+fn editorFactory(comptime T: type) ?*const fn () T {
+    switch (@typeInfo(T)) {
+        @typeInfo(Vec3) => |_| {
+            const gen = struct {
+                fn initDefault() T {
+                    return Vec3{ .x = 11.3, .y = 12.3, .z = 11.2 };
+                }
+            };
+            return &gen.initDefault;
+        },
+        else => {},
+    }
+    return null;
+}
 
 pub const Editor = struct {
     pub const TAGS = .{
         .ignore_list = .{ "gpa", "command_queue" },
         .points = .{ .add_default_item = &Vec3.initDefault },
+        .factory = &editorFactory,
     };
     const Self = @This();
     gpa: std.mem.Allocator,

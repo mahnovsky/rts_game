@@ -147,6 +147,21 @@ pub const VertexFormat = enum(u32) {
 };
 const VertexFormatBitSet = enums.EnumSet(VertexFormat);
 
+pub const TextureUV = struct {
+    const Self = @This();
+    pub const format: VertexFormatBitSet = VertexFormatBitSet.init(.{ .TextureUV = true });
+    u: f32,
+    v: f32,
+};
+
+pub const Vertex3 = struct {
+    const Self = @This();
+    pub const format: VertexFormatBitSet = VertexFormatBitSet.init(.{ .PositionXYZ = true });
+    x: f32,
+    y: f32,
+    z: f32,
+};
+
 pub const Vertex3P = struct {
     const Self = @This();
     pub const format: VertexFormatBitSet = VertexFormatBitSet.init(.{ .PositionXYZ = true, .ColorRGB = true });
@@ -348,7 +363,8 @@ pub const Program = struct {
 pub const DrawingObject = struct {
     const Self = @This();
     vao: ArrayObject,
-    vbo: BufferObject,
+    vbo: ?BufferObject,
+    buffers: []const BufferObject,
     texture: Texture,
     states: RenderStateFlags,
 
@@ -378,6 +394,42 @@ pub const DrawingObject = struct {
         return Self{
             .vao = vao,
             .vbo = buf,
+            .buffers = &.{},
+            .texture = texture,
+            .states = states,
+        };
+    }
+
+    pub fn initForSepareteBuffers(buffers: []const BufferObject, texture: Texture, states: RenderStateFlags) Self {
+        const vao = ArrayObject.init();
+        vao.bind();
+        var i: gl.GLuint = 0;
+        for (buffers) |buf| {
+            buf.bind();
+
+            const flags = enums.values(VertexFormat);
+            var offset: usize = 0;
+            for (flags) |flag| {
+                if (buf.format.contains(flag)) {
+                    const component_info = ComponentInfo.init(flag);
+                    const component_size = component_info.count * component_info.size;
+                    gl.glEnableVertexAttribArray(i);
+                    gl.glVertexAttribPointer(i, component_info.count, component_info.ctype, gl.GL_FALSE, buf.vertex_size, @ptrFromInt(offset));
+                    std.debug.print("Count {d}, ctype {d}, size {d}\n", .{ component_info.count, component_info.ctype, component_info.size });
+
+                    info("vertex attrib index: {d}, offset: {d}", .{ i, offset });
+
+                    offset += @intCast(component_size);
+                    i += 1;
+                }
+            }
+        }
+        ArrayObject.unbind();
+
+        return Self{
+            .vao = vao,
+            .vbo = null,
+            .buffers = buffers,
             .texture = texture,
             .states = states,
         };
@@ -395,7 +447,13 @@ pub const DrawingObject = struct {
         self.vao.bind();
         self.texture.bind();
 
-        gl.glDrawArrays(gl.GL_TRIANGLES, 0, @intCast(self.vbo.vertices));
+        if (self.vbo) |*vbo| {
+            gl.glDrawArrays(gl.GL_TRIANGLES, 0, @intCast(vbo.vertices));
+        } else {
+            std.debug.assert(self.buffers.len > 0);
+            //std.debug.print("draw buffers {d}, {d}\n", .{ self.buffers[0].vertices, self.buffers[1].vertices });
+            gl.glDrawArrays(gl.GL_TRIANGLES, 0, @intCast(self.buffers[0].vertices));
+        }
 
         ArrayObject.unbind();
     }

@@ -94,8 +94,9 @@ pub const MapData = struct {
 const MapRenderData = struct {
     const Self = @This();
     atlas: Atlas,
-    vertices: []opengl.Vertex3T,
-    vbo: opengl.BufferObject,
+    vertices: []opengl.Vertex3,
+    texture_coords: []opengl.TextureUV,
+    buffers: []opengl.BufferObject,
 
     fn init(gpa: std.mem.Allocator, map_data: MapData, atlas_image: *zigimg.Image) !Self {
         const atl = try Atlas.initGreed(gpa, atlas_image, 32, 32);
@@ -103,7 +104,7 @@ const MapRenderData = struct {
         var buffer: std.ArrayListUnmanaged(opengl.Vertex3T) = .empty;
         defer buffer.deinit(gpa);
 
-        const vertices = try makeVertexData(
+        const combined_vertices = try makeVertexData(
             gpa,
             &buffer,
             map_data.tile_data,
@@ -111,15 +112,27 @@ const MapRenderData = struct {
             @floatFromInt(map_data.width),
         );
 
+        const vertices = try gpa.alloc(opengl.Vertex3, combined_vertices.len);
+        const texture_coords = try gpa.alloc(opengl.TextureUV, combined_vertices.len);
+        for (combined_vertices, 0..) |*v, i| {
+            vertices[i] = .{ .x = v.x, .y = v.y, .z = v.z };
+            texture_coords[i] = .{ .u = v.u, .v = v.v };
+        }
+        const buffers = try gpa.alloc(opengl.BufferObject, 2);
+        buffers[0] = opengl.BufferObject.init(opengl.Vertex3, vertices, .Static);
+        buffers[1] = opengl.BufferObject.init(opengl.TextureUV, texture_coords, .Dynamic);
+
         return .{
             .atlas = atl,
-            .vertices = try gpa.dupe(opengl.Vertex3T, vertices),
-            .vbo = opengl.BufferObject.init(opengl.Vertex3T, vertices, .Dynamic),
+            .vertices = vertices,
+            .texture_coords = texture_coords,
+            .buffers = buffers,
         };
     }
 
     fn deinit(self: *Self, gpa: std.mem.Allocator) void {
         gpa.free(self.vertices);
+        gpa.free(self.texture_coords);
         self.atlas.deinit(gpa);
     }
 
@@ -136,13 +149,13 @@ const MapRenderData = struct {
 
         for (0..6) |i| {
             //std.log.debug("prev pos {d}:{d}", .{ self.vertices[vertex_offset + i].x, self.vertices[vertex_offset + i].y });
-            self.vertices[vertex_offset + i] = quad[i];
+            self.texture_coords[vertex_offset + i] = .{ .u = quad[i].u, .v = quad[i].v };
         }
 
-        self.vbo.update(
-            opengl.Vertex3T,
-            &quad,
-            vertex_offset * @sizeOf(opengl.Vertex3T),
+        self.buffers[1].update(
+            opengl.TextureUV,
+            self.texture_coords[vertex_offset..(vertex_offset + 6)],
+            vertex_offset * @sizeOf(opengl.TextureUV),
         );
     }
 };
@@ -172,8 +185,8 @@ pub const GameMap = struct {
             .render_data = render_data,
             .map_data = map_data,
             .shader = program,
-            .map_render = opengl.DrawingObject.init(
-                render_data.vbo,
+            .map_render = opengl.DrawingObject.initForSepareteBuffers(
+                render_data.buffers,
                 render_data.atlas.getTexture(),
                 .{ .flags = .init(.{ .Blend = true }), .func_params = .init(.{ .Blend = .TransparentBlend }) },
             ),

@@ -59,6 +59,12 @@ pub const Context = struct {
     }
 };
 
+pub const StringShowMode = enum {
+    Label,
+    EditBox,
+    ComboSelection,
+};
+
 pub const Panel = struct {
     const Self = @This();
     title: [:0]const u8,
@@ -268,11 +274,14 @@ pub const Panel = struct {
                 return &self.root_panel;
             }
 
-            fn modifySlice(ptr: *anyopaque, handle: []const u8) void {
+            fn modifySlice(ptr: *anyopaque, handle: []const u8, index: usize) void {
                 const self: *@This() = @ptrCast(@alignCast(ptr));
                 if (std.mem.eql(u8, handle, "add_default_item")) {
                     self.addNew();
                     self.base_ptr.* = self.elements.items;
+                }
+                if (std.mem.eql(u8, handle, "remove_item")) {
+                    self.removeItem(index);
                 }
 
                 self.buildUi();
@@ -281,6 +290,10 @@ pub const Panel = struct {
             fn addNew(self: *@This()) void {
                 std.debug.print("AddNew ui {d}\n", .{self.elements.items.len});
                 self.elements.append(self.gpa_alloc, self.add_default_item_fn()) catch @panic("oom");
+            }
+
+            fn removeItem(self: *@This(), index: usize) void {
+                _ = self.elements.orderedRemove(index);
             }
         };
 
@@ -362,6 +375,13 @@ pub const Panel = struct {
                         const element = blk: switch (@typeInfo(p.child)) {
                             info_u8 => break :blk reflectString(gpa, field.name, &@field(s, field.name)),
                             .@"struct" => {
+                                if (@hasField(@TypeOf(S.TAGS), "factory")) {
+                                    const gen = @field(S.TAGS, "factory");
+                                    if (gen(p.child)) |add_new_fn| {
+                                        break :blk reflectSliceOfStructs(p.child, gpa, field.name, &@field(s, field.name), add_new_fn);
+                                    }
+                                }
+
                                 if (!@hasField(@TypeOf(S.TAGS), field.name)) {
                                     @compileError("For slices of struct needed meta info, plz provide its in TAGS");
                                 }
@@ -440,7 +460,7 @@ pub const EditStringBox = struct {
 const EditableSlice = struct {
     container: *anyopaque,
     get_root_panel: *const fn (*anyopaque) *Panel,
-    modify_slice_fn: *const fn (*anyopaque, []const u8) void,
+    modify_slice_fn: *const fn (*anyopaque, []const u8, usize) void,
 };
 
 pub const Element = union(enum) {
@@ -480,12 +500,12 @@ fn drawPanel(wnd: *Panel) void {
     if (wnd.top_level) {
         imgui.igSetNextWindowSize(wnd.size, imgui.ImGuiCond_Appearing);
         if (imgui.igBegin(wnd.title, &wnd.is_open, 0)) {
-            drawElements(&wnd.children);
+            drawElements(&wnd.children, null, null);
         }
         imgui.igEnd();
     } else {
         if (imgui.igTreeNodeEx_Str(wnd.title, imgui.ImGuiTreeNodeFlags_Framed)) {
-            drawElements(&wnd.children);
+            drawElements(&wnd.children, null, null);
             imgui.igTreePop();
         }
     }
@@ -581,20 +601,65 @@ fn drawStringEdit(v: *EditStringBox) void {
     //callback: ?*const fn ([*c]struct_ImGuiInputTextCallbackData) c_int, null)
 }
 
-fn drawSlice(v: *EditableSlice) void {
-    const panel = v.get_root_panel(v.container);
-    drawElements(&panel.children);
-    drawButton(.{
-        .name = "+",
-        .handle = "add_default_item",
-        .size = .{ .x = 40, .y = 40 },
-        .user_data = v.container,
-        .callback = v.modify_slice_fn,
-    });
+fn pushButtonStyle() void {
+    const buttonColor = imgui.ImVec4{ .x = 0.2, .y = 0.5, .z = 0.3, .w = 1.0 }; // Normal color (greenish)
+    const hoveredColor = imgui.ImVec4{ .x = 0.3, .y = 0.6, .z = 0.4, .w = 1.0 }; // Color when hovered
+    const activeColor = imgui.ImVec4{ .x = 0.1, .y = 0.4, .z = 0.2, .w = 1.0 }; // Color when clicked
+
+    // Push the style colors or the specific button
+    imgui.igPushStyleColor_Vec4(imgui.ImGuiCol_Button, buttonColor);
+    imgui.igPushStyleColor_Vec4(imgui.ImGuiCol_ButtonHovered, hoveredColor);
+    imgui.igPushStyleColor_Vec4(imgui.ImGuiCol_ButtonActive, activeColor);
 }
 
-fn drawElements(elements: *std.ArrayList(Element)) void {
-    for (elements.items) |*item| {
+fn popButtonStyle() void {
+    imgui.igPopStyleColor(3);
+}
+
+fn sameLineWithOffset(text: [:0]const u8) void {
+    imgui.igSameLine(imgui.igGetContentRegionAvail().x * 0.4 + imgui.igCalcTextSize(text, "", false, 2).x, 0);
+}
+
+fn drawSlice(v: *EditableSlice) void {
+    const panel = v.get_root_panel(v.container);
+    // const style = imgui.igGetStyle();
+    // const size = style.*.TreeLinesSize;
+
+    // Move the cursor to the same line as the header.
+    imgui.igSetNextItemAllowOverlap();
+    const show_content = imgui.igTreeNodeEx_Str(panel.title, imgui.ImGuiTreeNodeFlags_Framed);
+    //imgui.igSameLine(imgui.igCalcTextSize(panel.title, "", false, 2).x + 100, 0);
+    sameLineWithOffset(panel.title);
+    pushButtonStyle();
+    if (imgui.igSmallButton("+")) {
+        v.modify_slice_fn(v.container, "add_default_item", 0);
+    }
+    popButtonStyle();
+    const gen = struct {
+        fn removeByIndex(data: *anyopaque, index: usize) void {
+            // imgui.igSameLine(imgui.igGetContentRegionAvail().x * 0.4 + imgui.igCalcTextSize("element xxx", "", false, 2).x, 0);
+            sameLineWithOffset("element xxx");
+            pushButtonStyle();
+            imgui.igPushID_Int(@intCast(index));
+            if (imgui.igSmallButton("-")) {
+                const s: *EditableSlice = @ptrCast(@alignCast(data));
+                s.modify_slice_fn(s.container, "remove_item", index);
+            }
+            imgui.igPopID();
+            popButtonStyle();
+        }
+    };
+    if (show_content) {
+        drawElements(&panel.children, v, &gen.removeByIndex);
+        imgui.igTreePop();
+    }
+
+    //imgui.igSameLine(imgui.igGetContentRegionAvail().x - imgui.igCalcTextSize("+", "+", false, 2).x - 1, 2);
+}
+
+fn drawElements(elements: *std.ArrayList(Element), data: ?*anyopaque, index_fn: ?*const fn (*anyopaque, usize) void) void {
+    for (elements.items, 0..) |*item, index| {
+        imgui.igSetNextItemAllowOverlap();
         switch (item.*) {
             .Panel => |*panel| {
                 drawPanel(panel);
@@ -647,6 +712,9 @@ fn drawElements(elements: *std.ArrayList(Element)) void {
             .EditableSlice => |*v| {
                 drawSlice(v);
             },
+        }
+        if (index_fn) |unwraped_index_fn| {
+            unwraped_index_fn(data.?, index);
         }
     }
 }
