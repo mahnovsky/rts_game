@@ -133,6 +133,7 @@ const MapRenderData = struct {
     fn deinit(self: *Self, gpa: std.mem.Allocator) void {
         gpa.free(self.vertices);
         gpa.free(self.texture_coords);
+        gpa.free(self.buffers);
         self.atlas.deinit(gpa);
     }
 

@@ -61,12 +61,17 @@ fn editorFactory(comptime T: type) ?*const fn () T {
     }
     return null;
 }
+const ts = @import("tileset.zig");
 
 pub const Editor = struct {
     pub const TAGS = .{
         .ignore_list = .{ "gpa", "command_queue" },
         .points = .{ .add_default_item = &Vec3.initDefault },
         .factory = &editorFactory,
+        .name = .{
+            .show_mode = imgui.StringShowMode.ComboSelection,
+            .selection_item_provider = &ts.textureAssetListInfo,
+        },
     };
     const Self = @This();
     gpa: std.mem.Allocator,
@@ -99,6 +104,8 @@ pub const Editor = struct {
             self.texture_view_window.?.close();
         }
         self.command_queue.deinit(self.gpa);
+        self.gpa.free(self.name);
+        self.gpa.free(self.points);
     }
 
     fn onButtonPressed(user_data: *anyopaque, handle: []const u8) void {
@@ -109,10 +116,12 @@ pub const Editor = struct {
 
         if (std.meta.stringToEnum(CommandType, handle)) |command| {
             switch (command) {
-                .OpenTextureView => self.pushCommand(.{ .OpenTextureView = .{
-                    .atl = game.map.render_data.atlas,
-                    .orig = @ptrCast(application.window.window.?),
-                } }) catch unreachable,
+                .OpenTextureView => self.pushCommand(.{
+                    .OpenTextureView = .{
+                        .atl = game.map.render_data.atlas,
+                        .orig = @ptrCast(application.window.window.?),
+                    },
+                }) catch unreachable,
                 .SaveCurrentMap => self.pushCommand(.SaveCurrentMap) catch unreachable,
                 else => {},
             }

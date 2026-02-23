@@ -365,10 +365,10 @@ pub const DrawingObject = struct {
     vao: ArrayObject,
     vbo: ?BufferObject,
     buffers: []const BufferObject,
-    texture: Texture,
+    texture: ?Texture,
     states: RenderStateFlags,
 
-    pub fn init(buf: BufferObject, texture: Texture, states: RenderStateFlags) Self {
+    pub fn init(buf: BufferObject, texture: ?Texture, states: RenderStateFlags) Self {
         const vao = ArrayObject.init();
         vao.bind();
         buf.bind();
@@ -445,7 +445,9 @@ pub const DrawingObject = struct {
 
     pub fn draw(self: Self) void {
         self.vao.bind();
-        self.texture.bind();
+        if (self.texture) |texture| {
+            texture.bind();
+        }
 
         if (self.vbo) |*vbo| {
             gl.glDrawArrays(gl.GL_TRIANGLES, 0, @intCast(vbo.vertices));

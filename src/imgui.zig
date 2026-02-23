@@ -90,9 +90,9 @@ pub const Panel = struct {
         }
 
         const gen = struct {
-            fn update(ptr: *anyopaque, selected: u32) void {
-                const self: *T = @ptrCast(@alignCast(ptr));
-                self.* = @enumFromInt(selected);
+            fn update(combo: *Combo) void {
+                const self: *T = @ptrCast(@alignCast(combo.ptr));
+                self.* = @enumFromInt(combo.selected);
                 std.debug.print("new item selected for {s}\n", .{@tagName(self.*)});
             }
         };
@@ -193,18 +193,53 @@ pub const Panel = struct {
         gpa: std.mem.Allocator,
         name: [:0]const u8,
         item_ptr: *[]const u8,
+        mode: StringShowMode,
+        combo_items_fn: ?*const fn (std.mem.Allocator) [][:0]const u8,
     ) Element {
-        const buffer = gpa.alloc(u8, 4096) catch unreachable;
-        @memset(buffer, 0);
-        std.mem.copyForwards(u8, buffer, item_ptr.*);
-        gpa.free(item_ptr.*);
-        item_ptr.* = buffer;
-        std.debug.print("String {s}\n", .{name});
-        return .{
-            .EditStringBox = .{
-                .title = name,
-                .value_ptr = item_ptr,
-                .buffer = buffer,
+        return blk: switch (mode) {
+            .EditBox => {
+                const buffer = gpa.alloc(u8, 4096) catch unreachable;
+                @memset(buffer, 0);
+                std.mem.copyForwards(u8, buffer, item_ptr.*);
+                gpa.free(item_ptr.*);
+                item_ptr.* = buffer;
+                std.debug.print("String {s}\n", .{name});
+                break :blk .{
+                    .EditStringBox = .{
+                        .title = name,
+                        .value_ptr = item_ptr,
+                        .buffer = buffer,
+                    },
+                };
+            },
+            .Label => {
+                break :blk .{
+                    .LabelString = .{
+                        .title = name,
+                        .text = gpa.dupeZ(u8, item_ptr.*) catch @panic("oom"),
+                    },
+                };
+            },
+            .ComboSelection => {
+                const items_fn = combo_items_fn orelse @panic("combo selection must provide items creation fn");
+
+                const gen = struct {
+                    fn update(combo: *Combo) void {
+                        if (combo.ptr) |ptr| {
+                            const x: *[]const u8 = @ptrCast(@alignCast(ptr));
+                            x.* = std.mem.span(combo.items[combo.selected].ptr);
+                        }
+                    }
+                };
+                break :blk .{
+                    .Combo = .{
+                        .ptr = @ptrCast(item_ptr),
+                        .title = name,
+                        .items = items_fn(gpa),
+                        .selected = 0,
+                        .update_fn = &gen.update,
+                    },
+                };
             },
         };
     }
@@ -351,6 +386,11 @@ pub const Panel = struct {
     pub fn reflectItem(self: *Self, comptime S: type, gpa: std.mem.Allocator, s: *S) void {
         const type_info = @typeInfo(S);
         inline for (type_info.@"struct".fields) |field| {
+            const meta = if (@hasDecl(S, "TAGS") and @hasField(@TypeOf(S.TAGS), field.name))
+                @field(S.TAGS, field.name)
+            else {};
+            const meta_type = @TypeOf(meta);
+
             switch (@typeInfo(field.type)) {
                 .@"enum" => |e| {
                     const element = reflectEnum(field.type, gpa, field.name, e, &@field(s, field.name));
@@ -373,7 +413,19 @@ pub const Panel = struct {
                     if (p.size == .slice) {
                         const info_u8 = @typeInfo(u8);
                         const element = blk: switch (@typeInfo(p.child)) {
-                            info_u8 => break :blk reflectString(gpa, field.name, &@field(s, field.name)),
+                            info_u8 => {
+                                const mode = if (@hasField(meta_type, "show_mode"))
+                                    meta.show_mode
+                                else
+                                    StringShowMode.EditBox;
+
+                                const combo_selector = if (@hasField(meta_type, "selection_item_provider"))
+                                    meta.selection_item_provider
+                                else
+                                    null;
+
+                                break :blk reflectString(gpa, field.name, &@field(s, field.name), mode, combo_selector);
+                            },
                             .@"struct" => {
                                 if (@hasField(@TypeOf(S.TAGS), "factory")) {
                                     const gen = @field(S.TAGS, "factory");
@@ -385,7 +437,6 @@ pub const Panel = struct {
                                 if (!@hasField(@TypeOf(S.TAGS), field.name)) {
                                     @compileError("For slices of struct needed meta info, plz provide its in TAGS");
                                 }
-                                const meta = @field(S.TAGS, field.name);
                                 break :blk reflectSliceOfStructs(p.child, gpa, field.name, &@field(s, field.name), meta.add_default_item);
                             },
                             else => unreachable,
@@ -430,12 +481,17 @@ pub const Text = struct {
     text: [:0]const u8,
 };
 
+pub const Label = struct {
+    title: [:0]const u8,
+    text: [:0]const u8,
+};
+
 pub const Combo = struct {
     ptr: ?*anyopaque,
     selected: u32,
     title: [:0]const u8,
     items: [][:0]const u8,
-    update_fn: *const fn (self: *anyopaque, item: u32) void,
+    update_fn: *const fn (*Combo) void,
 };
 
 pub const CheckBox = struct {
@@ -480,6 +536,7 @@ pub const Element = union(enum) {
     Uint16Value: ValueBox(u16),
     Uint32Value: ValueBox(u32),
     Uint64Value: ValueBox(u64),
+    LabelString: Label,
     EditStringBox: EditStringBox,
     EditableSlice: EditableSlice,
 };
@@ -521,12 +578,18 @@ fn drawText(txt: Text) void {
     imgui.igText(txt.text);
 }
 
+fn drawLabel(label: Label) void {
+    var buf: [1024]u8 = undefined;
+    const str = std.fmt.bufPrintZ(&buf, "{s}: {s}", .{ label.title, label.text }) catch @panic("oom");
+    imgui.igText(str);
+}
+
 fn drawCombo(cmb: *Combo) void {
     const current = cmb.selected;
     if (imgui.igBeginCombo(cmb.title, cmb.items[current], 0)) {
         for (0..cmb.items.len) |n| {
             const is_selected = (cmb.selected == n);
-            if (imgui.igSelectable_Bool(cmb.items[n], is_selected, 0, .{ .x = 200, .y = 50 })) {
+            if (imgui.igSelectable_Bool(cmb.items[n], is_selected, 0, .{ .x = 200, .y = 20 })) {
                 cmb.selected = @intCast(n);
             }
 
@@ -536,10 +599,10 @@ fn drawCombo(cmb: *Combo) void {
         }
         imgui.igEndCombo();
     }
-    if (cmb.ptr) |ptr| {
+    if (cmb.ptr != null) {
         if (current != cmb.selected) {
             std.debug.assert(cmb.selected < cmb.items.len);
-            cmb.update_fn(ptr, cmb.selected);
+            cmb.update_fn(cmb);
         }
     }
 }
@@ -711,6 +774,9 @@ fn drawElements(elements: *std.ArrayList(Element), data: ?*anyopaque, index_fn: 
             },
             .EditableSlice => |*v| {
                 drawSlice(v);
+            },
+            .LabelString => |v| {
+                drawLabel(v);
             },
         }
         if (index_fn) |unwraped_index_fn| {

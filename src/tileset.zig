@@ -3,6 +3,7 @@ const sr = @import("serializer.zig");
 const imgui = @import("imgui.zig");
 const app = @import("app.zig");
 const Assets = @import("Assets.zig");
+const Atlas = @import("atlas.zig").Atlas;
 
 pub const Group = enum {
     Dirt,
@@ -11,9 +12,10 @@ pub const Group = enum {
     Water,
 };
 
-pub const Type = enum {
-    Filler,
-    Border,
+pub const CollisionLayer = enum {
+    NoCollision,
+    Water,
+    Ground,
 };
 
 pub const Orient = enum(u32) {
@@ -30,23 +32,16 @@ pub const Orient = enum(u32) {
 
 pub const TileInfo = struct {
     group: Group,
-    type: Type,
+    layer: CollisionLayer,
     orient: Orient,
     frames: []u16,
 };
 
-fn textureAssetListInfo(gpa: std.mem.Allocator) []const []const u8 {
+pub fn textureAssetListInfo(gpa: std.mem.Allocator) [][:0]const u8 {
     const assets = app.context.getResourceUnchecked(Assets);
 
-    if (assets.getAssetList(gpa, Assets.Type.Texture)) |handles| {
-        defer gpa.free(handles);
-        const result = gpa.alloc([]const []const u8, handles.len);
-        for (handles, 0..) |item, index| {
-            result[index] = gpa.dupe(item.name);
-        }
-        return result;
-    }
-    @panic("Cant reach this");
+    return assets.getAssetListZ(Atlas, gpa) orelse
+        @panic("Cant reach this");
 }
 
 pub const Tileset = struct {

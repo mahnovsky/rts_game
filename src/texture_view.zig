@@ -15,6 +15,7 @@ pub const TextureView = struct {
     const Self = @This();
     rects: []atlas.Rect,
     texture_render: opengl.DrawingObject,
+    //selector: opengl.DrawingObject,
     gpa: std.mem.Allocator,
 
     pub fn init(gpa: std.mem.Allocator, atl: *const atlas.Atlas, proj: zm.Mat4f) !Self {
@@ -35,24 +36,30 @@ pub const TextureView = struct {
                 vertices[beg..end],
             );
         }
+
+        return .{
+            .rects = rects,
+            .texture_render = opengl.DrawingObject.init(
+                try makeVbo(opengl.Vertex3T, vertices, proj),
+                atl.getTexture(),
+                .{ .flags = .init(.{ .Blend = true }), .func_params = .init(.{ .Blend = .TransparentBlend }) },
+            ),
+            //.selector = opengl.DrawingObject.init(try makeVbo(opengl.Vertex3, &.{}, proj)),
+            .gpa = gpa,
+        };
+    }
+
+    fn makeVbo(comptime VertexType: type, vertices: []VertexType, proj: zm.Mat4f) !opengl.BufferObject {
         const vbo = opengl.BufferObject.init(opengl.Vertex3T, vertices, opengl.BufferUsage.Static);
 
-        const program = try opengl.Program.init(shaders.map_vshader, shaders.fshader);
+        const program = try opengl.Program.init(shaders.vshader, shaders.fshader);
         program.use();
         const ident = zm.Mat4f.identity();
         program.setUniformMatrix("Camera", ident);
         program.setUniformMatrix("Model", ident);
         program.setUniformMatrix("Projection", proj);
 
-        return .{
-            .rects = rects,
-            .texture_render = opengl.DrawingObject.init(
-                vbo,
-                atl.getTexture(),
-                .{ .flags = .init(.{ .Blend = true }), .func_params = .init(.{ .Blend = .TransparentBlend }) },
-            ),
-            .gpa = gpa,
-        };
+        return vbo;
     }
 
     pub fn deinit(self: Self) void {

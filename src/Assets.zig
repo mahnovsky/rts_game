@@ -48,11 +48,6 @@ pub const Content = union(Type) {
     }
 };
 
-pub const Handle = struct {
-    type: Type,
-    name: []const u8,
-};
-
 const FileAssetDesc = struct {
     uid: []const u8,
     path: []const u8,
@@ -203,17 +198,19 @@ fn loadMaps(self: *Self, gpa: std.mem.Allocator, lib: *const Lib) !void {
     }
 }
 
-pub fn getAssetList(self: *const Self, gpa: std.mem.Allocator, asset_type: Type) ?[]Handle {
-    var iter = self.assets[@intFromEnum(asset_type)].iterator();
-    const res: std.ArrayList(Handle) = .empty;
+pub fn getAssetListZ(self: *const Self, comptime T: type, gpa: std.mem.Allocator) ?[][:0]const u8 {
+    var container = self.objects.getResourceUnchecked(Container(T));
+    var iter = container.iterator();
+    var res: std.ArrayList([:0]const u8) = .empty;
     while (iter.next()) |entry| {
-        res.append(gpa, .{
-            .name = entry.key_ptr,
-            .type = asset_type,
-        });
+        res.append(
+            gpa,
+            gpa.dupeZ(u8, entry.key_ptr.*) catch return null,
+        ) catch @panic("test");
     }
 
-    return res.toOwnedSlice(gpa);
+    const slice = res.toOwnedSlice(gpa) catch null;
+    return slice;
 }
 
 pub fn getAsset(self: *const Self, comptime T: type, uid: []const u8) !T {
