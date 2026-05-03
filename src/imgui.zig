@@ -31,7 +31,7 @@ pub const Context = struct {
         }
 
         return .{
-            .ctx = ctx,
+            .ctx = ctx orelse @panic("No context"),
         };
     }
 

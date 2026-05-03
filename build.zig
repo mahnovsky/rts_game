@@ -97,8 +97,8 @@ pub fn buildGlfw3(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std
     };
 
     const windows_sources = [_][]const u8{
-        "win32_time.h",
-        "win32_thread.h",
+        //"win32_time.h",
+        //"win32_thread.h",
         "win32_module.c",
         "win32_time.c",
         "win32_thread.c",
@@ -224,7 +224,7 @@ var windows = false;
 var macos = false;
 
 pub fn build(b: *std.Build) void {
-    const target = b.standardTargetOptions(.{});
+    const target = b.standardTargetOptions(.{ .default_target = .{ .os_tag = std.Target.Os.Tag.windows, .abi = std.Target.Abi.msvc } });
     // .default_target = .{ .os_tag = std.Target.Os.Tag.windows, .abi = std.Target.Abi.msvc } });
     const optimize = b.standardOptimizeOption(.{});
 
@@ -268,7 +268,8 @@ pub fn build(b: *std.Build) void {
 
     root_module.linkLibrary(glad);
     root_module.linkLibrary(glfw3);
-    root_module.link_libcpp = true;
+    //root_module.link_libcpp = true;
+
     //root_module.linkLibrary(cimgui);
     //root_module.linkSystemLibrary("glfw3", .{});
     if (windows) {
@@ -283,6 +284,8 @@ pub fn build(b: *std.Build) void {
         root_module.linkSystemLibrary("uuid", .{});
         root_module.linkSystemLibrary("comdlg32", .{});
         root_module.linkSystemLibrary("advapi32", .{});
+        root_module.linkSystemLibrary("cimgui", .{ .preferred_link_mode = .static });
+        //root_module.addObjectFile(b.path("external/cimgui/cimgui.lib"));
     }
     if (macos) {
         std.log.info("add frameworks", .{});
