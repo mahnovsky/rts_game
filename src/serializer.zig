@@ -47,7 +47,7 @@ pub fn YamlSerializer(comptime S: type) type {
     return struct {
         const Self = @This();
 
-        fn load(gpa: Allocator, data: []const u8) S {
+        pub fn load(gpa: Allocator, data: []const u8) S {
             var doc = Yaml{ .source = data };
             doc.load(gpa) catch {
                 unreachable;
@@ -59,7 +59,7 @@ pub fn YamlSerializer(comptime S: type) type {
             return map_data;
         }
 
-        fn save(gpa: Allocator, map_data: *const S) []u8 {
+        pub fn save(gpa: Allocator, map_data: *const S) []u8 {
             var body = std.Io.Writer.Allocating.init(gpa);
             defer body.deinit();
             yaml.stringify(

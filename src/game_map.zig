@@ -56,6 +56,7 @@ const Allocator = std.mem.Allocator;
 
 pub const MapData = struct {
     const Self = @This();
+    const Serializer = sr.CurrentSerializer(@This());
     const TileSize: f32 = 32 * TileScale;
     const empty: Self = .{ .width = 0, .height = 0, .tile_data = &.{} };
 
@@ -63,28 +64,44 @@ pub const MapData = struct {
     height: u32,
     tile_data: []u16,
 
-    pub fn load(gpa: std.mem.Allocator, data: []u8, s: fn (comptime type) type) !MapData {
-        return sr.Serializer(MapData).init(s(MapData)).load(gpa, data);
+    pub fn validateCoords(self: *const Self, comptime T: type, x: T, y: T) bool {
+        const type_info = @typeInfo(T);
+        if (type_info != .int) {
+            @compileError("This func takes only integer types for 'T'");
+        }
+
+        if (type_info.int.signedness == .signed and (x < 0 or y < 0)) {
+            @panic("The value of coords cant be negative");
+        }
+
+        const tx: u32 = @intCast(x);
+        const ty: u32 = @intCast(y);
+
+        return tx < self.width and ty < self.height;
     }
 
-    pub fn save(self: Self, gpa: std.mem.Allocator, comptime s: fn (comptime type) type) ![]u8 {
-        return sr.Serializer(MapData).init(s(MapData)).save(gpa, &self);
+    pub fn load(gpa: std.mem.Allocator, data: []u8) !MapData {
+        return Serializer.load(gpa, data);
     }
 
-    pub fn deinit(self: Self, gpa: std.mem.Allocator) void {
+    pub fn save(self: *const Self, gpa: std.mem.Allocator) ![]u8 {
+        return Serializer.save(gpa, self);
+    }
+
+    pub fn deinit(self: *const Self, gpa: std.mem.Allocator) void {
         gpa.free(self.tile_data);
     }
 
-    pub fn getTile(self: Self, x: u32, y: u32) ?u16 {
-        if (x < self.width and y < self.height) {
+    pub fn getTile(self: *const Self, x: u32, y: u32) ?u16 {
+        if (self.validateCoords(u32, x, y)) {
             const index = x + y * self.width;
             return self.tile_data[index];
         }
         return null;
     }
 
-    pub fn setTile(self: Self, x: u32, y: u32, tile: u16) void {
-        if (x < self.width and y < self.height) {
+    pub fn setTile(self: *const Self, x: u32, y: u32, tile: u16) void {
+        if (self.validateCoords(u32, x, y)) {
             const index = x + y * self.width;
             self.tile_data[index] = tile;
         }

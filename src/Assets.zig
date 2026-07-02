@@ -181,7 +181,7 @@ fn loadAtlases(self: *Self, gpa: std.mem.Allocator, lib: *const Lib) !void {
         const texture = try self.getAsset(opengl.Texture, info.texture);
         const atl = try Atlas.initGreedFromTexture(gpa, texture, info.greed_width, info.greed_height);
         std.debug.print("asset load atlas {s}\n", .{info.uid});
-        self.putAsset(Atlas, info.uid, atl) catch unreachable;
+        try self.putAsset(Atlas, info.uid, atl);
     }
 }
 
@@ -193,7 +193,7 @@ fn loadMaps(self: *Self, gpa: std.mem.Allocator, lib: *const Lib) !void {
         defer gpa.free(full_path);
         const data = try utils.readFileData(gpa, full_path);
         defer gpa.free(data);
-        const map_data = try map.MapData.load(gpa, data, sr.YamlSerializer);
+        const map_data = try map.MapData.load(gpa, data);
         try self.putAsset(map.MapData, info.uid, map_data);
     }
 }

@@ -63,9 +63,79 @@ fn editorFactory(comptime T: type) ?*const fn () T {
 }
 const ts = @import("tileset.zig");
 
+const TilesetEditor = struct {
+    const Self = @This();
+    pub const TAGS = .{
+        .ignore_list = .{ "panel", "tile_index", "tile_view" },
+        .factory = &editorFactory,
+        .atlas_id = .{
+            .show_mode = imgui.StringShowMode.ComboSelection,
+            .selection_item_provider = &ts.textureAssetListInfo,
+        },
+    };
+
+    panel: imgui.Panel,
+    atlas_id: []const u8,
+    tile_index: u32,
+    tile_view: imgui.Image,
+
+    pub fn init(gpa: std.mem.Allocator) !Self {
+        const game = app.context.getResourceUnchecked(Game);
+
+        var s: TilesetEditor = .{
+            .panel = .{
+                .title = "Tileset editor",
+                .children = .empty,
+                .size = .{ .x = 400, .y = 400 },
+                .top_level = false,
+                .post_elements_draw = &Self.draw,
+            },
+            .atlas_id = "",
+            .tile_index = 0,
+            .tile_view = .{
+                .id = game.map.render_data.atlas.texture.handle,
+                .uv0_x = 0.1,
+                .uv0_y = 0.1,
+                .uv1_x = 0.2,
+                .uv1_y = 0.2,
+            },
+        };
+
+        s.panel.reflectItem(Self, gpa, &s);
+
+        return s;
+    }
+
+    fn draw(panel: *const imgui.Panel) void {
+        const self: *Self = @ptrCast(@alignCast(panel.user_data.?));
+        self.tile_view.draw();
+
+        if (imgui.drawButtonInplace("test", 200, 50)) {
+            self.tile_index += 1;
+        }
+    }
+
+    pub fn onGui(self: *@This()) void {
+        if (self.panel.user_data == null) {
+            self.panel.user_data = @ptrCast(self);
+        }
+        imgui.drawPanel(&self.panel);
+    }
+};
+
+const Editors = union(enum) {
+    Tileset: TilesetEditor,
+
+    fn onGui(self: *@This()) void {
+        switch (self.*) {
+            .Tileset => |*t| t.onGui(),
+        }
+    }
+};
+
 pub const Editor = struct {
     pub const TAGS = .{
-        .ignore_list = .{ "gpa", "command_queue" },
+        .ignore_list = .{ "gpa", "command_queue", "subeditors" },
         .points = .{ .add_default_item = &Vec3.initDefault },
         .factory = &editorFactory,
         .name = .{
@@ -81,6 +151,7 @@ pub const Editor = struct {
     editor_window: ?imgui.Handle = null,
     points: []Vec3,
     name: []const u8,
+    subeditors: [std.meta.fields(Editors).len]Editors,
 
     pub fn init(gpa: std.mem.Allocator) Self {
         const name = gpa.alloc(u8, 4) catch unreachable;
@@ -95,6 +166,7 @@ pub const Editor = struct {
             .texture_view_window = null,
             .points = points,
             .name = name,
+            .subeditors = .{.{ .Tileset = try .init(gpa) }},
         };
     }
 
@@ -134,6 +206,8 @@ pub const Editor = struct {
             return;
         }
 
+        const game = app.context.getResource(Game).?;
+
         var children = try std.ArrayList(imgui.Element).initCapacity(self.gpa, 10);
         try children.append(self.gpa, .{ .Button = .{
             .name = "Open tiles window",
@@ -151,14 +225,32 @@ pub const Editor = struct {
             .callback = &onButtonPressed,
         } });
 
+        try children.append(self.gpa, .{ .Image = .{
+            .id = @intCast(game.map.render_data.atlas.texture.handle),
+            .uv0_x = 0,
+            .uv0_y = 0,
+            .uv1_x = 1,
+            .uv1_y = 1,
+        } });
+
         var wnd: imgui.Panel = .{
             .title = "Editor",
             .size = .{ .x = 400, .y = 400 },
             .children = children,
+            .user_data = self,
+            .post_elements_draw = &Self.imguiPostDraw,
         };
 
         wnd.reflectItem(Self, self.gpa, self);
         self.editor_window = try main_wnd.im_context.addWindow(self.gpa, wnd);
+    }
+
+    pub fn imguiPostDraw(panel: *const imgui.Panel) void {
+        const self: *Self = @ptrCast(@alignCast(panel.user_data.?));
+
+        if (self.subeditors.len > 0) {
+            self.subeditors[0].onGui();
+        }
     }
 
     pub fn pushCommand(self: *Self, command: Command) !void {
@@ -211,7 +303,7 @@ pub const Editor = struct {
                     .ClickOnMap => |coords| game.map.tryReplaceTile(coords[0], coords[1], self.tile_index),
                     .SaveCurrentMap => {
                         //const data = try game.map.map_data.save(application.allocator, Serializer(MapData).init(YamlSerializer(MapData)));
-                        const data = try game.map.map_data.save(application.allocator, YamlSerializer);
+                        const data = try game.map.map_data.save(application.allocator);
                         defer application.allocator.free(data);
                         try utils.writeFileData("./data/maps/test_map.yaml", data);
                     },

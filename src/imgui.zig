@@ -22,7 +22,8 @@ pub const Context = struct {
     counter: usize = 0,
 
     pub fn init(window: ?*glfw.GLFWwindow) !Self {
-        const ctx = imgui.igCreateContext(null);
+        const ctx = imgui.igCreateContext(null) orelse return error.ImGuiError;
+
         if (!imgui.ImGui_ImplGlfw_InitForOpenGL(@ptrCast(window), true)) {
             return error.ImGuiError;
         }
@@ -31,7 +32,7 @@ pub const Context = struct {
         }
 
         return .{
-            .ctx = ctx orelse @panic("No context"),
+            .ctx = ctx,
         };
     }
 
@@ -72,6 +73,8 @@ pub const Panel = struct {
     is_open: bool = false,
     size: imgui.ImVec2_c,
     children: std.ArrayList(Element),
+    user_data: ?*anyopaque = null,
+    post_elements_draw: ?*const fn (*const Self) void = null,
 
     fn deinit(self: *@This(), gpa: std.mem.Allocator) void {
         self.children.deinit(gpa);
@@ -391,7 +394,16 @@ pub const Panel = struct {
             else {};
             const meta_type = @TypeOf(meta);
 
+            if (@hasDecl(S, "TAGS") and @hasField(@TypeOf(S.TAGS), "ignore_list")) {
+                const ignore_list = @field(S.TAGS, "ignore_list");
+
+                if (comptime !check_field_not_ignore(ignore_list, field.name)) {
+                    continue;
+                }
+            }
+
             switch (@typeInfo(field.type)) {
+                .@"union" => {},
                 .@"enum" => |e| {
                     const element = reflectEnum(field.type, gpa, field.name, e, &@field(s, field.name));
                     self.children.append(gpa, element) catch unreachable;
@@ -427,16 +439,17 @@ pub const Panel = struct {
                                 break :blk reflectString(gpa, field.name, &@field(s, field.name), mode, combo_selector);
                             },
                             .@"struct" => {
-                                if (@hasField(@TypeOf(S.TAGS), "factory")) {
+                                if (@hasDecl(S, "TAGS") and @hasField(@TypeOf(S.TAGS), "factory")) {
                                     const gen = @field(S.TAGS, "factory");
                                     if (gen(p.child)) |add_new_fn| {
                                         break :blk reflectSliceOfStructs(p.child, gpa, field.name, &@field(s, field.name), add_new_fn);
                                     }
                                 }
 
-                                if (!@hasField(@TypeOf(S.TAGS), field.name)) {
+                                if (@hasDecl(S, "TAGS") and !@hasField(@TypeOf(S.TAGS), field.name)) {
                                     @compileError("For slices of struct needed meta info, plz provide its in TAGS");
                                 }
+
                                 break :blk reflectSliceOfStructs(p.child, gpa, field.name, &@field(s, field.name), meta.add_default_item);
                             },
                             else => unreachable,
@@ -449,23 +462,34 @@ pub const Panel = struct {
                     // const meta = @field(S.TAGS, field.name);
                     // const db_type = meta.db_type;
                     // const description = meta.description;
-                    var ignore = false;
-                    if (@hasField(@TypeOf(S.TAGS), "ignore_list")) {
+                    //var ignore = false;
+                    if (@hasDecl(S, "TAGS") and @hasField(@TypeOf(S.TAGS), "ignore_list")) {
                         const ignore_list = @field(S.TAGS, "ignore_list");
-                        inline for (ignore_list) |item| {
-                            if (std.mem.eql(u8, item, field.name)) {
-                                ignore = true;
-                            }
-                        }
-                    }
 
-                    if (!ignore) {
+                        if (comptime check_field_not_ignore(ignore_list, field.name)) {
+                            self.children.append(gpa, reflectStruct(field.type, gpa, field.name, &@field(s, field.name))) catch unreachable;
+                        }
+                    } else {
                         self.children.append(gpa, reflectStruct(field.type, gpa, field.name, &@field(s, field.name))) catch unreachable;
                     }
+
+                    // if (!ignore) {
+                    //     self.children.append(gpa, reflectStruct(field.type, gpa, field.name, &@field(s, field.name))) catch unreachable;
+                    // }
                 },
                 else => {},
             }
         }
+    }
+
+    fn check_field_not_ignore(comptime list: anytype, comptime field_name: []const u8) bool {
+        inline for (list) |item| {
+            if (comptime std.mem.eql(u8, item, field_name)) {
+                //@compileLog(field_name ++ " found");
+                return false;
+            }
+        }
+        return true;
     }
 };
 
@@ -519,6 +543,24 @@ const EditableSlice = struct {
     modify_slice_fn: *const fn (*anyopaque, []const u8, usize) void,
 };
 
+pub const Image = struct {
+    id: imgui.ImTextureID,
+    uv0_x: f32,
+    uv0_y: f32,
+    uv1_x: f32,
+    uv1_y: f32,
+
+    pub fn draw(self: *const @This()) void {
+        const uv_min: imgui.ImVec2 = .{ .x = self.uv0_x, .y = self.uv0_y };
+        const uv_max: imgui.ImVec2 = .{ .x = self.uv1_x, .y = self.uv1_y };
+
+        imgui.igImage(.{
+            ._TexID = self.id,
+            ._TexData = null,
+        }, .{ .x = 128, .y = 128 }, uv_min, uv_max);
+    }
+};
+
 pub const Element = union(enum) {
     const Self = @This();
     Panel: Panel,
@@ -526,6 +568,7 @@ pub const Element = union(enum) {
     Text: Text,
     Combo: Combo,
     CheckBox: CheckBox,
+    Image: Image,
     Float32Value: ValueBox(f32),
     Float64Value: ValueBox(f64),
     Int8Value: ValueBox(i8),
@@ -553,16 +596,26 @@ pub fn init(window: ?*glfw.GLFWwindow) error{ImGuiError}!Context {
     return context;
 }
 
-fn drawPanel(wnd: *Panel) void {
+pub fn drawPanel(wnd: *Panel) void {
     if (wnd.top_level) {
         imgui.igSetNextWindowSize(wnd.size, imgui.ImGuiCond_Appearing);
         if (imgui.igBegin(wnd.title, &wnd.is_open, 0)) {
             drawElements(&wnd.children, null, null);
         }
+
+        if (wnd.post_elements_draw) |post_draw| {
+            post_draw(wnd);
+        }
+
         imgui.igEnd();
     } else {
         if (imgui.igTreeNodeEx_Str(wnd.title, imgui.ImGuiTreeNodeFlags_Framed)) {
             drawElements(&wnd.children, null, null);
+
+            if (wnd.post_elements_draw) |post_draw| {
+                post_draw(wnd);
+            }
+
             imgui.igTreePop();
         }
     }
@@ -778,6 +831,9 @@ fn drawElements(elements: *std.ArrayList(Element), data: ?*anyopaque, index_fn: 
             .LabelString => |v| {
                 drawLabel(v);
             },
+            .Image => |img| {
+                img.draw();
+            },
         }
         if (index_fn) |unwraped_index_fn| {
             unwraped_index_fn(data.?, index);
@@ -801,4 +857,8 @@ pub fn drawImgui(ctx: *const Context) void {
     //glClearColor(clearColor.x, clearColor.y, clearColor.z, clearColor.w);
     //glClear(GL_COLOR_BUFFER_BIT);
     imgui.ImGui_ImplOpenGL3_RenderDrawData(imgui.igGetDrawData());
+}
+
+pub fn drawButtonInplace(name: [:0]const u8, w: f32, h: f32) bool {
+    return imgui.igButton(name, .{ .x = w, .y = h });
 }
