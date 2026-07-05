@@ -20,6 +20,7 @@ pub const Context = struct {
     ctx: *imgui.struct_ImGuiContext,
     windows: std.AutoArrayHashMapUnmanaged(Handle, Panel) = .empty,
     counter: usize = 0,
+    imgui_frame_fn: ?*const fn () void = null,
 
     pub fn init(window: ?*glfw.GLFWwindow) !Self {
         const ctx = imgui.igCreateContext(null) orelse return error.ImGuiError;
@@ -70,6 +71,7 @@ pub const PanelDrawMode = enum {
     OnlyChildren,
     Collapsable,
     Window,
+    MenuBar,
 };
 
 pub const Panel = struct {
@@ -84,9 +86,10 @@ pub const Panel = struct {
     post_elements_draw: ?*const fn (*const Self) void = null,
 
     fn draw(self: *Self) void {
-        if (self.show_mode == .Window) {
+        if (self.show_mode == .Window or self.show_mode == .MenuBar) {
+            const flags = if (self.show_mode == .MenuBar) imgui.ImGuiWindowFlags_MenuBar else 0;
             imgui.igSetNextWindowSize(self.size, imgui.ImGuiCond_Appearing);
-            if (imgui.igBegin(self.title, &self.is_open, 0)) {
+            if (imgui.igBegin(self.title, &self.is_open, flags)) {
                 drawElements(&self.children, null, null);
             }
 
@@ -904,11 +907,15 @@ pub fn drawImgui(ctx: *const Context) void {
     imgui.ImGui_ImplGlfw_NewFrame();
     imgui.igNewFrame();
 
+    if (ctx.imgui_frame_fn) |frame_update_fn| {
+        std.log.debug("Frame update-", .{});
+        frame_update_fn();
+    }
+
     var it = ctx.windows.iterator();
     while (it.next()) |entry| {
         drawPanel(entry.value_ptr);
     }
-
     imgui.igRender();
     //glfwMakeContextCurrent(window);
     //glViewport(0, 0, (int)ioptr->DisplaySize.x, (int)ioptr->DisplaySize.y);
@@ -936,3 +943,27 @@ pub fn drawSelectionRect() void {
 
     imgui.ImDrawList_AddRect(list, min, max, 0xFF0000FF, 0.1, 0, 1.0);
 }
+
+pub const MenuBar = struct {
+    pub fn begin() bool {
+        return imgui.igBeginMenuBar();
+    }
+
+    pub fn end() void {
+        imgui.igEndMenuBar();
+    }
+
+    pub fn beginMenu(name: [*]const u8) bool {
+        return imgui.igBeginMenu(name, true);
+    }
+
+    pub fn endMenu() void {
+        imgui.igEndMenu();
+    }
+
+    pub fn item(name: [*]const u8) bool {
+        return imgui.igMenuItem_Bool(name, "Ctrl+N", false, true);
+    }
+
+    pub fn draw() void {}
+};

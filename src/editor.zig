@@ -223,6 +223,7 @@ pub const Editor = struct {
         for (points) |*p| {
             p.* = Vec3.initDefault();
         }
+
         return .{
             .gpa = gpa,
             .command_queue = .empty,
@@ -269,36 +270,26 @@ pub const Editor = struct {
             return;
         }
 
-        const game = app.context.getResource(Game).?;
+        const children = try std.ArrayList(imgui.Element).initCapacity(self.gpa, 10);
+        // try children.append(self.gpa, .{ .Button = .{
+        //     .name = "Open tiles window",
+        //     .handle = @tagName(CommandType.OpenTextureView),
+        //     .size = .{ .x = 200, .y = 50 },
+        //     .user_data = self,
+        //     .callback = &onButtonPressed,
+        // } });
 
-        var children = try std.ArrayList(imgui.Element).initCapacity(self.gpa, 10);
-        try children.append(self.gpa, .{ .Button = .{
-            .name = "Open tiles window",
-            .handle = @tagName(CommandType.OpenTextureView),
-            .size = .{ .x = 200, .y = 50 },
-            .user_data = self,
-            .callback = &onButtonPressed,
-        } });
-
-        try children.append(self.gpa, .{ .Button = .{
-            .name = "Save",
-            .handle = @tagName(CommandType.SaveCurrentMap),
-            .size = .{ .x = 200, .y = 50 },
-            .user_data = self,
-            .callback = &onButtonPressed,
-        } });
-
-        try children.append(self.gpa, .{ .Image = .{
-            .id = @intCast(game.map.render_data.atlas.texture.handle),
-            .uv0_x = 0,
-            .uv0_y = 0,
-            .uv1_x = 1,
-            .uv1_y = 1,
-        } });
+        // try children.append(self.gpa, .{ .Button = .{
+        //     .name = "Save",
+        //     .handle = @tagName(CommandType.SaveCurrentMap),
+        //     .size = .{ .x = 200, .y = 50 },
+        //     .user_data = self,
+        //     .callback = &onButtonPressed,
+        // } });
 
         var wnd: imgui.Panel = .{
             .title = "Editor",
-            .show_mode = .Window,
+            .show_mode = .MenuBar,
             .size = .{ .x = 400, .y = 400 },
             .children = children,
             .user_data = self,
@@ -314,6 +305,22 @@ pub const Editor = struct {
 
         if (self.subeditors.len > 0) {
             self.subeditors[0].onGui();
+        }
+        const MenuBar = imgui.MenuBar;
+        if (MenuBar.begin()) {
+            if (MenuBar.beginMenu("File")) {
+                if (MenuBar.item("New")) {}
+
+                MenuBar.end();
+            }
+
+            if (MenuBar.beginMenu("Tools")) {
+                if (MenuBar.item("New")) {}
+
+                MenuBar.end();
+            }
+
+            MenuBar.end();
         }
     }
 
