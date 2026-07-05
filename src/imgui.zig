@@ -66,15 +66,53 @@ pub const StringShowMode = enum {
     ComboSelection,
 };
 
+pub const PanelDrawMode = enum {
+    OnlyChildren,
+    Collapsable,
+    Window,
+};
+
 pub const Panel = struct {
     const Self = @This();
     title: [:0]const u8,
+    show_mode: PanelDrawMode = .Collapsable,
     top_level: bool = true,
     is_open: bool = false,
     size: imgui.ImVec2_c,
     children: std.ArrayList(Element),
     user_data: ?*anyopaque = null,
     post_elements_draw: ?*const fn (*const Self) void = null,
+
+    fn draw(self: *Self) void {
+        if (self.show_mode == .Window) {
+            imgui.igSetNextWindowSize(self.size, imgui.ImGuiCond_Appearing);
+            if (imgui.igBegin(self.title, &self.is_open, 0)) {
+                drawElements(&self.children, null, null);
+            }
+
+            if (self.post_elements_draw) |post_draw| {
+                post_draw(self);
+            }
+
+            imgui.igEnd();
+        } else if (self.show_mode == .Collapsable) {
+            if (imgui.igTreeNodeEx_Str(self.title, imgui.ImGuiTreeNodeFlags_Framed)) {
+                drawElements(&self.children, null, null);
+
+                if (self.post_elements_draw) |post_draw| {
+                    post_draw(self);
+                }
+
+                imgui.igTreePop();
+            }
+        } else if (self.show_mode == .OnlyChildren) {
+            drawElements(&self.children, null, null);
+
+            if (self.post_elements_draw) |post_draw| {
+                post_draw(self);
+            }
+        }
+    }
 
     fn deinit(self: *@This(), gpa: std.mem.Allocator) void {
         self.children.deinit(gpa);
@@ -178,8 +216,9 @@ pub const Panel = struct {
         };
     }
 
-    pub fn reflectStruct(comptime S: type, gpa: std.mem.Allocator, name: [:0]const u8, s: *S) Element {
+    pub fn reflectStruct(comptime S: type, gpa: std.mem.Allocator, name: [:0]const u8, s: *S, mode: PanelDrawMode) Element {
         var panel: Panel = .{
+            .show_mode = mode,
             .is_open = false,
             .top_level = false,
             .title = name,
@@ -302,8 +341,16 @@ pub const Panel = struct {
                         .size = .{ .x = 400, .y = 400 },
                         .children = .empty,
                     };
-                    panel.reflectItem(S, self.gpa_alloc, item);
-                    self.root_panel.children.append(self.gpa_alloc, .{ .Panel = panel }) catch @panic("oom");
+                    if (comptime @typeInfo(S) == .@"struct") {
+                        panel.reflectItem(S, self.gpa_alloc, item);
+
+                        self.root_panel.children.append(self.gpa_alloc, .{ .Panel = panel }) catch @panic("oom");
+                    } else {
+                        for (0..self.elements.items.len) |i| {
+                            const elem = reflectValue(S, "element", &self.elements.items[i]);
+                            self.root_panel.children.append(self.gpa_alloc, elem) catch @panic("oom");
+                        }
+                    }
                 }
             }
 
@@ -423,20 +470,23 @@ pub const Panel = struct {
                 .pointer => |p| {
                     std.debug.print("Pointer {s}, {s}, {s}\n", .{ field.name, @typeName(p.child), @tagName(p.size) });
                     if (p.size == .slice) {
-                        const info_u8 = @typeInfo(u8);
                         const element = blk: switch (@typeInfo(p.child)) {
-                            info_u8 => {
-                                const mode = if (@hasField(meta_type, "show_mode"))
-                                    meta.show_mode
-                                else
-                                    StringShowMode.EditBox;
+                            .int => |info| {
+                                if (info.bits == 8 and info.signedness == .unsigned) {
+                                    const mode = if (@hasField(meta_type, "show_mode"))
+                                        meta.show_mode
+                                    else
+                                        StringShowMode.EditBox;
 
-                                const combo_selector = if (@hasField(meta_type, "selection_item_provider"))
-                                    meta.selection_item_provider
-                                else
-                                    null;
+                                    const combo_selector = if (@hasField(meta_type, "selection_item_provider"))
+                                        meta.selection_item_provider
+                                    else
+                                        null;
 
-                                break :blk reflectString(gpa, field.name, &@field(s, field.name), mode, combo_selector);
+                                    break :blk reflectString(gpa, field.name, &@field(s, field.name), mode, combo_selector);
+                                } else {
+                                    break :blk reflectSliceOfStructs(p.child, gpa, field.name, &@field(s, field.name), meta.add_default_item);
+                                }
                             },
                             .@"struct" => {
                                 if (@hasDecl(S, "TAGS") and @hasField(@TypeOf(S.TAGS), "factory")) {
@@ -463,14 +513,19 @@ pub const Panel = struct {
                     // const db_type = meta.db_type;
                     // const description = meta.description;
                     //var ignore = false;
+                    const mode = if (comptime @typeInfo(meta_type) == .@"struct" and @hasField(meta_type, "show_mode"))
+                        meta.show_mode
+                    else
+                        PanelDrawMode.Collapsable;
+
                     if (@hasDecl(S, "TAGS") and @hasField(@TypeOf(S.TAGS), "ignore_list")) {
                         const ignore_list = @field(S.TAGS, "ignore_list");
 
                         if (comptime check_field_not_ignore(ignore_list, field.name)) {
-                            self.children.append(gpa, reflectStruct(field.type, gpa, field.name, &@field(s, field.name))) catch unreachable;
+                            self.children.append(gpa, reflectStruct(field.type, gpa, field.name, &@field(s, field.name), mode)) catch unreachable;
                         }
                     } else {
-                        self.children.append(gpa, reflectStruct(field.type, gpa, field.name, &@field(s, field.name))) catch unreachable;
+                        self.children.append(gpa, reflectStruct(field.type, gpa, field.name, &@field(s, field.name)), mode) catch unreachable;
                     }
 
                     // if (!ignore) {
@@ -545,10 +600,11 @@ const EditableSlice = struct {
 
 pub const Image = struct {
     id: imgui.ImTextureID,
-    uv0_x: f32,
-    uv0_y: f32,
-    uv1_x: f32,
-    uv1_y: f32,
+    uv0_x: f32 = 0,
+    uv0_y: f32 = 0,
+    uv1_x: f32 = 0,
+    uv1_y: f32 = 0,
+    size: struct { w: f32, h: f32 } = .{ .w = 64, .h = 64 },
 
     pub fn draw(self: *const @This()) void {
         const uv_min: imgui.ImVec2 = .{ .x = self.uv0_x, .y = self.uv0_y };
@@ -557,7 +613,7 @@ pub const Image = struct {
         imgui.igImage(.{
             ._TexID = self.id,
             ._TexData = null,
-        }, .{ .x = 128, .y = 128 }, uv_min, uv_max);
+        }, .{ .x = self.size.w, .y = self.size.h }, uv_min, uv_max);
     }
 };
 
@@ -597,28 +653,30 @@ pub fn init(window: ?*glfw.GLFWwindow) error{ImGuiError}!Context {
 }
 
 pub fn drawPanel(wnd: *Panel) void {
-    if (wnd.top_level) {
-        imgui.igSetNextWindowSize(wnd.size, imgui.ImGuiCond_Appearing);
-        if (imgui.igBegin(wnd.title, &wnd.is_open, 0)) {
-            drawElements(&wnd.children, null, null);
-        }
+    wnd.draw();
 
-        if (wnd.post_elements_draw) |post_draw| {
-            post_draw(wnd);
-        }
+    // if (wnd.top_level) {
+    //     imgui.igSetNextWindowSize(wnd.size, imgui.ImGuiCond_Appearing);
+    //     if (imgui.igBegin(wnd.title, &wnd.is_open, 0)) {
+    //         drawElements(&wnd.children, null, null);
+    //     }
 
-        imgui.igEnd();
-    } else {
-        if (imgui.igTreeNodeEx_Str(wnd.title, imgui.ImGuiTreeNodeFlags_Framed)) {
-            drawElements(&wnd.children, null, null);
+    //     if (wnd.post_elements_draw) |post_draw| {
+    //         post_draw(wnd);
+    //     }
 
-            if (wnd.post_elements_draw) |post_draw| {
-                post_draw(wnd);
-            }
+    //     imgui.igEnd();
+    // } else {
+    //     if (imgui.igTreeNodeEx_Str(wnd.title, imgui.ImGuiTreeNodeFlags_Framed)) {
+    //         drawElements(&wnd.children, null, null);
 
-            imgui.igTreePop();
-        }
-    }
+    //         if (wnd.post_elements_draw) |post_draw| {
+    //             post_draw(wnd);
+    //         }
+
+    //         imgui.igTreePop();
+    //     }
+    // }
 }
 
 fn drawButton(btn: Button) void {
@@ -861,4 +919,20 @@ pub fn drawImgui(ctx: *const Context) void {
 
 pub fn drawButtonInplace(name: [:0]const u8, w: f32, h: f32) bool {
     return imgui.igButton(name, .{ .x = w, .y = h });
+}
+
+pub fn isItemPressed() bool {
+    return imgui.igIsItemClicked(imgui.ImGuiMouseButton_Left);
+}
+
+pub fn SetSameLine(space: f32) void {
+    imgui.igSameLine(0, space);
+}
+
+pub fn drawSelectionRect() void {
+    const list = imgui.igGetWindowDrawList();
+    const min = imgui.igGetItemRectMin();
+    const max = imgui.igGetItemRectMax();
+
+    imgui.ImDrawList_AddRect(list, min, max, 0xFF0000FF, 0.1, 0, 1.0);
 }

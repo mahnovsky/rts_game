@@ -66,52 +66,115 @@ const ts = @import("tileset.zig");
 const TilesetEditor = struct {
     const Self = @This();
     pub const TAGS = .{
-        .ignore_list = .{ "panel", "tile_index", "tile_view" },
+        .ignore_list = .{ "gpa", "panel", "tile_view", "tileset" },
         .factory = &editorFactory,
         .atlas_id = .{
             .show_mode = imgui.StringShowMode.ComboSelection,
             .selection_item_provider = &ts.textureAssetListInfo,
         },
+        .tile_info = .{
+            .show_mode = imgui.PanelDrawMode.OnlyChildren,
+        },
     };
 
+    gpa: std.mem.Allocator,
     panel: imgui.Panel,
     atlas_id: []const u8,
-    tile_index: u32,
     tile_view: imgui.Image,
+    tile_info: ts.TileInfo,
+    tileset: std.ArrayList(ts.TileInfo),
 
-    pub fn init(gpa: std.mem.Allocator) !Self {
+    pub fn init(gpa: std.mem.Allocator) *Self {
         const game = app.context.getResourceUnchecked(Game);
 
-        var s: TilesetEditor = .{
+        const s = gpa.create(@This()) catch unreachable;
+        s.* = .{
+            .gpa = gpa,
             .panel = .{
                 .title = "Tileset editor",
+                .show_mode = .Collapsable,
                 .children = .empty,
                 .size = .{ .x = 400, .y = 400 },
                 .top_level = false,
                 .post_elements_draw = &Self.draw,
             },
             .atlas_id = "",
-            .tile_index = 0,
             .tile_view = .{
                 .id = game.map.render_data.atlas.texture.handle,
-                .uv0_x = 0.1,
-                .uv0_y = 0.1,
-                .uv1_x = 0.2,
-                .uv1_y = 0.2,
             },
+            .tile_info = .{
+                .atlas_index = 0,
+                .group = .Dirt,
+                .layer = .NoCollision,
+                .orient = .Center,
+                .frames = &.{},
+            },
+            .tileset = .empty,
         };
 
-        s.panel.reflectItem(Self, gpa, &s);
+        s.panel.reflectItem(Self, gpa, s);
 
         return s;
+    }
+
+    fn set_image_for_index(image: *imgui.Image, index: u32) void {
+        const game = app.context.getResourceUnchecked(Game);
+
+        const rect = game.map.render_data.atlas.rects[@intCast(index)];
+        const tsize = game.map.render_data.atlas.getTextureSize();
+        const tpos = rect.getPosition();
+        const rect_size = rect.getSize();
+        const ou: f32 = tpos.x / tsize.w;
+        const ov: f32 = tpos.y / tsize.h;
+        const u = ou + (rect_size.w / tsize.w);
+        const v = ov + (rect_size.h / tsize.h);
+
+        image.uv0_x = ou;
+        image.uv0_y = ov;
+        image.uv1_x = u;
+        image.uv1_y = v;
     }
 
     fn draw(panel: *const imgui.Panel) void {
         const self: *Self = @ptrCast(@alignCast(panel.user_data.?));
         self.tile_view.draw();
 
-        if (imgui.drawButtonInplace("test", 200, 50)) {
-            self.tile_index += 1;
+        if (imgui.drawButtonInplace("add tile", 200, 30)) {
+            const found_index = blk: {
+                for (0..self.tileset.items.len) |i| {
+                    if (self.tileset.items[i].atlas_index == self.tile_info.atlas_index) {
+                        break :blk i;
+                    }
+                }
+                break :blk self.tileset.items.len;
+            };
+
+            if (found_index == self.tileset.items.len) {
+                self.tileset.append(self.gpa, self.tile_info) catch unreachable;
+            }
+        }
+
+        const game = app.context.getResourceUnchecked(Game);
+        var image: imgui.Image = .{
+            .id = game.map.render_data.atlas.texture.handle,
+        };
+
+        for (self.tileset.items) |*item| {
+            set_image_for_index(&image, item.atlas_index);
+
+            image.draw();
+
+            if (imgui.isItemPressed()) {
+                self.tile_info = item.*;
+                set_image_for_index(&self.tile_view, item.atlas_index);
+                imgui.drawSelectionRect();
+            }
+
+            if (item.atlas_index == self.tile_info.atlas_index) {
+                imgui.drawSelectionRect();
+            }
+
+            imgui.SetSameLine(3);
         }
     }
 
@@ -124,11 +187,11 @@ const TilesetEditor = struct {
 };
 
 const Editors = union(enum) {
-    Tileset: TilesetEditor,
+    Tileset: *TilesetEditor,
 
     fn onGui(self: *@This()) void {
         switch (self.*) {
-            .Tileset => |*t| t.onGui(),
+            .Tileset => |*t| t.*.onGui(),
         }
     }
 };
@@ -166,7 +229,7 @@ pub const Editor = struct {
             .texture_view_window = null,
             .points = points,
             .name = name,
-            .subeditors = .{.{ .Tileset = try .init(gpa) }},
+            .subeditors = .{.{ .Tileset = TilesetEditor.init(gpa) }},
         };
     }
 
@@ -235,6 +298,7 @@ pub const Editor = struct {
 
         var wnd: imgui.Panel = .{
             .title = "Editor",
+            .show_mode = .Window,
             .size = .{ .x = 400, .y = 400 },
             .children = children,
             .user_data = self,

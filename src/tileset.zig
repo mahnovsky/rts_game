@@ -31,10 +31,21 @@ pub const Orient = enum(u32) {
 };
 
 pub const TileInfo = struct {
+    pub const TAGS = .{
+        .frames = .{
+            .add_default_item = &initDefaultFrame,
+        },
+    };
+
+    atlas_index: u32,
     group: Group,
     layer: CollisionLayer,
     orient: Orient,
     frames: []u16,
+
+    fn initDefaultFrame() u16 {
+        return 0;
+    }
 };
 
 pub fn textureAssetListInfo(gpa: std.mem.Allocator) [][:0]const u8 {
